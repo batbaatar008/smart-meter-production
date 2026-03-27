@@ -117,23 +117,35 @@ elif menu == "📈 График":
         df_p['Date'] = pd.to_datetime(df_p['Date'])
         today = datetime.date.today()
         
-        # 1. Сарын нийт
-        st.subheader("📊 Сарын нийт үйлдвэрлэл")
-        df_p['Month_Name'] = df_p['Date'].dt.strftime('%Y-%m')
-        m_data = df_p.groupby(['Month_Name', 'Meter Model'])['Quantity'].sum().unstack().fillna(0)
+        # 1. САРЫН НИЙТ (Баганан график)
+        st.subheader("📊 1. Сарын нийт үйлдвэрлэл (Бүх хугацаа)")
+        df_p['Month_Label'] = df_p['Date'].dt.strftime('%Y-%m')
+        m_data = df_p.groupby(['Month_Label', 'Meter Model'])['Quantity'].sum().unstack().fillna(0)
         st.bar_chart(m_data)
+        
+        st.divider()
 
-        # 2. Одоо байгаа сар
-        st.subheader(f"📉 {today.year} оны {today.month}-р сарын явц")
+        # 2. ОДООГИЙН САРЫН ӨДӨР ТУТМЫН ЯВЦ (Шугаман график)
+        st.subheader(f"📉 2. {today.year} оны {today.month}-р сарын өдөр тутмын явц")
         df_active = df_p[(df_p['Date'].dt.year == today.year) & (df_p['Date'].dt.month == today.month)]
         if not df_active.empty:
             d_data = df_active.groupby(['Date', 'Meter Model'])['Quantity'].sum().unstack().fillna(0)
             d_data.index = d_data.index.date
             st.line_chart(d_data)
         else:
-            st.info("Энэ сард бүртгэл алга.")
+            st.info(f"{today.month}-р сард одоогоор бүртгэл ороогүй байна.")
+
+        st.divider()
+
+        # 3. НИЙТ ХУРИМТЛАГДСАН ӨСӨЛТ (Жилийн нийт явц)
+        st.subheader("📈 3. Нийт үйлдвэрлэлийн хуримтлагдсан өсөлт (Жил дамнан)")
+        # Огноогоор эрэмбэлж, нийт дүнг хуримтлуулж бодно
+        df_sorted = df_p.sort_values('Date')
+        c_data = df_sorted.groupby('Date')['Quantity'].sum().cumsum()
+        st.area_chart(c_data)
+        
     else:
-        st.info("Өгөгдөл алга.")
+        st.info("График харуулах өгөгдөл алга.")
 
 # --- 4. ТАЙЛАН (ЗАСВАР ОРСОН ХЭСЭГ) ---
 elif menu == "📋 Тайлан":
