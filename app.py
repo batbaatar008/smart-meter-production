@@ -3,7 +3,7 @@ import pandas as pd
 import datetime
 import os
 
-# --- ТОХИРГОО ---
+# --- ТӨХӨӨРӨМЖИЙН ТОХИРГОО ---
 st.set_page_config(page_title="DSEDN Smart Meter ERP", layout="wide", page_icon="⚡")
 
 DATA_FILE = "production_data.csv"
@@ -31,10 +31,6 @@ def load_contracts():
 
 def save_data(df, file):
     df.to_csv(file, index=False)
-
-def to_excel(df):
-    output = pd.io.formats.excel.ExcelFormatter(df).get_result()
-    return output
 
 # Session State
 if 'prod_df' not in st.session_state: st.session_state.prod_df = load_production()
@@ -78,7 +74,7 @@ if menu == "🏠 Бүртгэл":
 
     if not st.session_state.prod_df.empty:
         df_s = st.session_state.prod_df.sort_values(by="Date", ascending=False)
-        for i, r in df_s.head(10).iterrows(): # Сүүлийн 10-ыг харуулна
+        for i, r in df_s.head(10).iterrows():
             with st.expander(f"📅 {r['Date']} | {r['Meter Model']} | {r['Quantity']} ш"):
                 c1, c2 = st.columns(2)
                 if c1.button("Засах", key=f"e{r['ID']}"): st.session_state.editing_id = r['ID']; st.rerun()
@@ -109,24 +105,27 @@ elif menu == "📦 Нийлүүлэлт":
 
 # --- 3. ГРАФИК ---
 elif menu == "📈 График":
-    st.header("📈 Үйлдвэрлэлийн явц")
+    st.header("📈 Үйлдвэрлэлийн шинжилгээ")
     df_p = st.session_state.prod_df.copy()
     if not df_p.empty:
         df_p['Date'] = pd.to_datetime(df_p['Date'])
-        curr_month = datetime.date.today().month
-        curr_year = datetime.date.today().year
         
-        # 2. ЗАСВАР: Зөвхөн одоо байгаа сарын өгөгдөл
-        df_curr = df_p[(df_p['Date'].dt.month == curr_month) & (df_p['Date'].dt.year == curr_year)]
-        
-        if not df_curr.empty:
-            st.subheader(f"📊 {curr_month}-р сарын өдөр тутмын үйлдвэрлэл")
-            d_data = df_curr.groupby(['Date', 'Meter Model'])['Quantity'].sum().unstack().fillna(0)
-            st.bar_chart(d_data) # Үйлдвэрлэлгүй өдрийг автоматаар алгасна
-        
-        st.divider()
-        st.subheader("📈 Нийт үйлдвэрлэлийн өсөлт")
-        st.area_chart(df_p.groupby('Date')['Quantity'].sum().cumsum())
+        # График 1: Сар бүрээр (Bar)
+        st.subheader("📊 1. Сар бүрийн нийт үйлдвэрлэл")
+        df_p['Month'] = df_p['Date'].dt.strftime('%m сар')
+        m_data = df_p.groupby(['Month', 'Meter Model'])['Quantity'].sum().unstack().fillna(0)
+        st.bar_chart(m_data)
+
+        # График 2: Өдөр бүрээр (Line) - Хоосон өдрийг харуулахгүй
+        st.subheader("📉 2. Өдөр тутмын үйлдвэрлэлийн явц (Line)")
+        d_data = df_p.groupby(['Date', 'Meter Model'])['Quantity'].sum().unstack().fillna(0)
+        st.line_chart(d_data) # Streamlit line_chart нь өөрөө датагүй өдрийг алгасдаг
+
+        # График 3: Хуримтлагдсан өсөлт
+        st.subheader("📈 3. Нийт үйлдвэрлэлийн хуримтлагдсан өсөлт")
+        df_sorted = df_p.sort_values('Date')
+        c_data = df_sorted.groupby('Date')['Quantity'].sum().cumsum()
+        st.area_chart(c_data)
     else:
         st.info("Өгөгдөл алга.")
 
@@ -138,18 +137,30 @@ elif menu == "📋 Тайлан":
     
     if not df_p.empty:
         df_p['Date'] = pd.to_datetime(df_p['Date'])
+        df_p['Month'] = df_p['Date'].dt.month
         df_p['Year'] = df_p['Date'].dt.year
         
-        # 3. ЗАСВАР: Зөвхөн оноор харуулах
+        # 1. Сар бүрийн хүснэгтийг буцааж оруулав
+        st.subheader("📅 Сарын нэгтгэл хүснэгт")
+        month_pivot = df_p.pivot_table(index='Month', columns='Meter Model', values='Quantity', aggfunc='sum', fill_value=0)
+        month_pivot.index = [f"{m} сар" for m in month_pivot.index]
+        # Нийт дүн
+        month_pivot.loc['НИЙТ ДҮН'] = month_pivot.sum()
+        month_pivot['НИЙТ'] = month_pivot.sum(axis=1)
+        st.dataframe(month_pivot, use_container_width=True)
+
+        st.divider()
+        
+        # 2. Жилийн тайлан
         st.subheader("🗓️ Үйлдвэрлэл оноор")
         year_pivot = df_p.pivot_table(index='Year', columns='Meter Model', values='Quantity', aggfunc='sum', fill_value=0)
-        
-        # 1. ЗАСВАР: Нийт дүн нэмэх
         year_pivot.loc['НИЙТ ДҮН'] = year_pivot.sum()
         year_pivot['НИЙТ'] = year_pivot.sum(axis=1)
         st.dataframe(year_pivot, use_container_width=True)
 
         st.divider()
+        
+        # 3. Нийлүүлэлт болон Үлдэгдэл
         st.subheader("📦 Нийлүүлэлт болон Үлдэгдэл")
         supply_cols = [c for c in df_c.columns if c != "Марк"]
         df_c['Нийт Нийлүүлэлт'] = df_c[supply_cols].sum(axis=1)
@@ -159,11 +170,11 @@ elif menu == "📋 Тайлан":
         final = pd.merge(df_c[['Марк', 'Нийт Нийлүүлэлт']], prod_sum, on="Марк", how="left").fillna(0)
         final["Үлдэгдэл"] = final["Нийт Нийлүүлэлт"] - final["Үйлдвэрлэсэн"]
         
-        # Нийт дүн нэмэх
+        # Нийт дүн
         final.loc[len(final)] = ["НИЙТ ДҮН", final['Нийт Нийлүүлэлт'].sum(), final['Үйлдвэрлэсэн'].sum(), final['Үлдэгдэл'].sum()]
         st.dataframe(final, use_container_width=True, hide_index=True)
 
-# --- 5. ШИНЭ: АРХИВ ---
+# --- 5. АРХИВ ---
 elif menu == "🗄️ Архив":
     st.header("🗄️ Үйлдвэрлэлийн түүхэн архив")
     df_p = st.session_state.prod_df.copy()
@@ -181,22 +192,15 @@ elif menu == "🗄️ Архив":
         with tab1:
             st.subheader(f"{sel_year} оны сарын нэгтгэл")
             df_year = df_p[df_p['Year'] == sel_year]
-            month_pivot = df_year.pivot_table(index='Month', columns='Meter Model', values='Quantity', aggfunc='sum', fill_value=0)
-            month_pivot.index = [f"{m} сар" for m in month_pivot.index]
-            month_pivot.loc['НИЙТ ДҮН'] = month_pivot.sum()
-            st.dataframe(month_pivot, use_container_width=True)
-            
-            # Excel татах
-            csv = month_pivot.to_csv().encode('utf-8-sig')
-            st.download_button("📥 Excel (CSV) татах", csv, f"Report_{sel_year}_Monthly.csv", "text/csv")
+            m_pivot = df_year.pivot_table(index='Month', columns='Meter Model', values='Quantity', aggfunc='sum', fill_value=0)
+            m_pivot.index = [f"{m} сар" for m in m_pivot.index]
+            m_pivot.loc['НИЙТ ДҮН'] = m_pivot.sum()
+            st.dataframe(m_pivot, use_container_width=True)
+            st.download_button("📥 Excel татах", m_pivot.to_csv().encode('utf-8-sig'), f"Monthly_{sel_year}.csv")
 
         with tab2:
             st.subheader(f"{sel_year} оны өдөр тутмын бүртгэл")
-            day_pivot = df_year.pivot_table(index='Date', columns='Meter Model', values='Quantity', aggfunc='sum', fill_value=0)
-            day_pivot.loc['НИЙТ ДҮН'] = day_pivot.sum()
-            st.dataframe(day_pivot, use_container_width=True)
-            
-            csv_day = day_pivot.to_csv().encode('utf-8-sig')
-            st.download_button("📥 Excel (CSV) татах", csv_day, f"Report_{sel_year}_Daily.csv", "text/csv")
-    else:
-        st.info("Архивлах өгөгдөл алга.")
+            d_pivot = df_year.pivot_table(index='Date', columns='Meter Model', values='Quantity', aggfunc='sum', fill_value=0)
+            d_pivot.loc['НИЙТ ДҮН'] = d_pivot.sum()
+            st.dataframe(d_pivot, use_container_width=True)
+            st.download_button("📥 Excel татах", d_pivot.to_csv().encode('utf-8-sig'), f"Daily_{sel_year}.csv")
