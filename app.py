@@ -49,13 +49,13 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
     
-    is_admin = st.toggle("🛠️ Засах эрх идэвхжүүлэх", value=False)
+    is_admin = st.toggle("🛠️ Засах эрх идэвхүүлэх", value=False)
     st.divider()
     menu = st.radio("Үндсэн цэс:", ["📋 Тайлан", "📈 График", "🗄️ Архив", "🏠 Бүртгэл", "📦 Нийлүүлэлт", "⚙️ Тохиргоо"])
     st.divider()
     st.caption("Зохиогч С.БАТБААТАР | 2026")
 
-# --- 1. ТАЙЛАН (Алдаа засагдсан хэсэг) ---
+# --- 1. ТАЙЛАН ---
 if menu == "📋 Тайлан":
     st.header("📋 Үйлдвэрлэлийн нэгтгэл тайлан")
     df_p = st.session_state.prod_df.copy()
@@ -63,9 +63,9 @@ if menu == "📋 Тайлан":
     
     if not df_p.empty:
         df_p['Date'] = pd.to_datetime(df_p['Date'])
-        # Зөвхөн огноотой (тоон утгатай) багануудыг шүүж авах
         supply_cols = [c for c in df_c.columns if c != "Марк"]
         
+        # --- 1. САРЫН ЗАДАРГАА ---
         st.subheader("📅 1. Сарын үйлдвэрлэлийн задаргаа")
         available_years = sorted(df_p['Date'].dt.year.unique(), reverse=True)
         report_year = st.selectbox("Тайлан үзэх он сонгох:", available_years)
@@ -80,13 +80,14 @@ if menu == "📋 Тайлан":
             st.dataframe(pd.concat([m_pivot, total_row]), use_container_width=True)
         
         st.divider()
+
+        # --- 2. ОНЫ ГҮЙЦЭТГЭЛ (ХӨЛ ДҮНТЭЙ) ---
         st.subheader("📊 2. Оны гүйцэтгэл болон Дамнасан үлдэгдэл")
         co_year = st.selectbox("Carry-over тооцох он:", available_years, key="co_y")
         
         prev_prod = df_p[df_p['Date'].dt.year < co_year].groupby("Meter Model")["Quantity"].sum()
         curr_prod = df_p[df_p['Date'].dt.year == co_year].groupby("Meter Model")["Quantity"].sum()
         
-        # ЭНД ЗАСВАР ОРОВ: Баганын нэр тоо мөн эсэхийг шалгана
         prev_cols = [c for c in supply_cols if c.split('-')[0].isdigit() and int(c.split('-')[0]) < co_year]
         this_cols = [c for c in supply_cols if c.split('-')[0].isdigit() and int(c.split('-')[0]) == co_year]
         
@@ -97,12 +98,25 @@ if menu == "📋 Тайлан":
             t_sup = df_c[df_c['Марк'] == model][this_cols].sum(axis=1).values[0] if this_cols else 0
             t_prod = curr_prod.get(model, 0)
             co_data.append({
-                "Марк": model, "Өмнөх оны үлдэгдэл": carry_over, "Шинэ нийлүүлэлт": t_sup, 
-                "Нийт боломжит": carry_over + t_sup, "Үйлдвэрлэсэн": t_prod, "Эцсийн үлдэгдэл": (carry_over + t_sup) - t_prod
+                "Марк": model, 
+                "Өмнөх оны үлдэгдэл": carry_over, 
+                "Шинэ нийлүүлэлт": t_sup, 
+                "Нийт боломжит": carry_over + t_sup, 
+                "Үйлдвэрлэсэн": t_prod, 
+                "Эцсийн үлдэгдэл": (carry_over + t_sup) - t_prod
             })
-        st.dataframe(pd.DataFrame(co_data), use_container_width=True, hide_index=True)
+        
+        df_co = pd.DataFrame(co_data)
+        # Хөл дүн тооцох
+        if not df_co.empty:
+            co_totals = df_co.select_dtypes(include=['number']).sum().to_frame().T
+            co_totals["Марк"] = "🔥🔥 НИЙТ"
+            df_co_final = pd.concat([df_co, co_totals], ignore_index=True)
+            st.dataframe(df_co_final, use_container_width=True, hide_index=True)
 
         st.divider()
+
+        # --- 3. НИЙТ НИЙЛҮҮЛЭЛТ (ХӨЛ ДҮНТЭЙ) ---
         st.subheader("📦 3. Нийт Нийлүүлэлт болон Үлдэгдэл")
         total_supply = df_c[supply_cols].sum(axis=1)
         total_produced = df_p.groupby("Meter Model")["Quantity"].sum()
@@ -112,7 +126,12 @@ if menu == "📋 Тайлан":
             "Нийт Үйлдвэрлэсэн": df_c["Марк"].map(total_produced).fillna(0),
         })
         all_report["Үлдэгдэл"] = all_report["Нийт Нийлүүлэлт"] - all_report["Нийт Үйлдвэрлэсэн"]
-        st.dataframe(all_report, use_container_width=True, hide_index=True)
+        
+        # Хөл дүн тооцох
+        all_totals = all_report.select_dtypes(include=['number']).sum().to_frame().T
+        all_totals["Марк"] = "🔥🔥 НИЙТ"
+        all_report_final = pd.concat([all_report, all_totals], ignore_index=True)
+        st.dataframe(all_report_final, use_container_width=True, hide_index=True)
 
 # --- 2. ГРАФИК ---
 elif menu == "📈 График":
