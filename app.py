@@ -19,9 +19,6 @@ def load_models():
         pd.DataFrame({"Model": initial_models}).to_csv(MODELS_FILE, index=False)
         return initial_models
 
-def save_models(models_list):
-    pd.DataFrame({"Model": models_list}).to_csv(MODELS_FILE, index=False)
-
 def load_production():
     if os.path.exists(DATA_FILE):
         df = pd.read_csv(DATA_FILE)
@@ -33,7 +30,7 @@ def load_contracts():
     models = load_models()
     if os.path.exists(CONTRACT_FILE):
         return pd.read_csv(CONTRACT_FILE)
-    return pd.DataFrame({"Марк": models, "2026-03-01": [0]*len(models)})
+    return pd.DataFrame({"Марк": models})
 
 def save_data(df, file):
     df.to_csv(file, index=False)
@@ -44,7 +41,7 @@ if 'prod_df' not in st.session_state: st.session_state.prod_df = load_production
 if 'contract_df' not in st.session_state: st.session_state.contract_df = load_contracts()
 if 'editing_id' not in st.session_state: st.session_state.editing_id = None
 
-# --- SIDEBAR (Цэсний шинэ дараалал) ---
+# --- SIDEBAR ---
 with st.sidebar:
     st.markdown("""
         <div style='background-color:#004488; padding:15px; border-radius:10px; text-align:center;'>
@@ -56,97 +53,91 @@ with st.sidebar:
     is_admin = st.toggle("🛠️ Засах эрх идэвхжүүлэх", value=False)
     
     st.divider()
-    # Цэсний дараалал чиний хүссэнээр:
-    menu = st.radio("Үндсэн цэс:", [
-        "📋 Тайлан", 
-        "📈 График", 
-        "🗄️ Архив", 
-        "🏠 Бүртгэл", 
-        "📦 Нийлүүлэлт", 
-        "⚙️ Тохиргоо"
-    ])
+    menu = st.radio("Үндсэн цэс:", ["📋 Тайлан", "📈 График", "🗄️ Архив", "🏠 Бүртгэл", "📦 Нийлүүлэлт", "⚙️ Тохиргоо"])
     st.divider()
     st.caption("Зохиогч С.БАТБААТАР | 2026")
 
-# --- 1. ТАЙЛАН ---
+# --- 1. ТАЙЛАН (Carry-over үлдэгдэлтэй хувилбар) ---
 if menu == "📋 Тайлан":
     st.header("📋 Жилийн нэгтгэл тайлан")
     
     df_p = st.session_state.prod_df.copy()
     df_c = st.session_state.contract_df.copy()
     
-    # 1. Он сонгох (Шүүлтүүр)
-    available_years = sorted(list(set(pd.to_datetime(df_p['Date']).dt.year) | {datetime.date.today().year}), reverse=True)
+    # Сонгох боломжтой онууд
+    current_year = datetime.date.today().year
+    available_years = sorted(list(set(pd.to_datetime(df_p['Date']).dt.year) | {current_year}), reverse=True)
     selected_year = st.selectbox("Тайлан харах он сонгох:", available_years)
 
     if not df_p.empty:
         df_p['Date'] = pd.to_datetime(df_p['Date'])
-        df_p['Year'] = df_p['Date'].dt.year
         
-        # --- ӨМНӨХ ОНООС ШИЛЖИЖ ИРСЭН ҮЛДЭГДЭЛ ТООЦОХ ---
+        # 1. ӨМНӨХ ОНУУДЫН НИЙТ ҮЛДЭГДЭЛ ТОХИРУУЛАХ
+        supply_cols = [c for c in df_c.columns if c != "Марк"]
+        prev_supply_cols = [c for c in supply_cols if int(c[:4]) < selected_year]
+        this_year_supply_cols = [c for c in supply_cols if int(c[:4]) == selected_year]
+        
         # Өмнөх онуудын нийт нийлүүлэлт
-        prev_years_supply_cols = [col for col in df_c.columns if col != "Марк" and int(col[:4]) < selected_year]
-        prev_supply = df_c[prev_years_supply_cols].sum(axis=1) if prev_years_supply_cols else 0
-        
+        df_c['Prev_Total_Supply'] = df_c[prev_supply_cols].sum(axis=1) if prev_supply_cols else 0
         # Өмнөх онуудын нийт үйлдвэрлэл
-        prev_production = df_p[df_p['Year'] < selected_year].groupby("Meter Model")["Quantity"].sum()
+        prev_prod = df_p[df_p['Date'].dt.year < selected_year].groupby("Meter Model")["Quantity"].sum()
         
-        # Шилжиж ирсэн үлдэгдэл (Carry-over)
-        carry_over = pd.DataFrame(index=df_c["Марк"])
-        carry_over['Өмнөх оны үлдэгдэл'] = prev_supply - carry_over.index.map(prev_production).fillna(0)
-
-        # --- ТУХАЙН ОНЫ ТАЙЛАН ---
+        # 2. ТУХАЙН ОНЫ МЭДЭЭЛЭЛ
+        df_c['This_Year_Supply'] = df_c[this_year_supply_cols].sum(axis=1) if this_year_supply_cols else 0
+        this_year_prod = df_p[df_p['Date'].dt.year == selected_year].groupby("Meter Model")["Quantity"].sum()
+        
+        # 3. НЭГТГЭЛ ХҮСНЭГТ БАЙГУУЛАХ
+        report_data = []
+        for model in st.session_state.models:
+            p_supply = df_c[df_c['Марк'] == model]['Prev_Total_Supply'].values[0] if model in df_c['Марк'].values else 0
+            p_prod = prev_prod.get(model, 0)
+            carry_over = p_supply - p_prod # Өмнөх оны үлдэгдэл
+            
+            t_supply = df_c[df_c['Марк'] == model]['This_Year_Supply'].values[0] if model in df_c['Марк'].values else 0
+            t_prod = this_year_prod.get(model, 0)
+            
+            report_data.append({
+                "Тоолуурын марк": model,
+                "Өмнөх оны үлдэгдэл": carry_over,
+                "Шинэ нийлүүлэлт": t_supply,
+                "Нийт боломжит": carry_over + t_supply,
+                "Үйлдвэрлэсэн": t_prod,
+                "Эцсийн үлдэгдэл": (carry_over + t_supply) - t_prod
+            })
+            
+        report_df = pd.DataFrame(report_data)
         st.subheader(f"📅 {selected_year} оны гүйцэтгэл")
-        
-        # Тухайн оны нийлүүлэлтийн баганууд
-        this_year_supply_cols = [col for col in df_c.columns if col != "Марк" and int(col[:4]) == selected_year]
-        current_supply = df_c[this_year_supply_cols].sum(axis=1) if this_year_supply_cols else 0
-        
-        # Тухайн оны үйлдвэрлэл
-        current_prod = df_p[df_p['Year'] == selected_year].groupby("Meter Model")["Quantity"].sum()
-        
-        # Нэгтгэл хүснэгт
-        report_df = pd.DataFrame({
-            "Марк": df_c["Марк"],
-            "Өмнөх оны үлдэгдэл": carry_over['Өмнөх оны үлдэгдэл'].values,
-            "Шинэ нийлүүлэлт": current_supply,
-            "Нийт боломжит": carry_over['Өмнөх оны үлдэгдэл'].values + current_supply,
-            "Үйлдвэрлэсэн": report_df["Марк"].map(current_prod).fillna(0),
-        })
-        report_df["Эцсийн үлдэгдэл"] = report_df["Нийт боломжит"] - report_df["Үйлдвэрлэсэн"]
-        
         st.dataframe(report_df, use_container_width=True, hide_index=True)
+        
+        st.divider()
+        st.subheader("📊 Сарын үйлдвэрлэлийн явц (Бүх хугацаа)")
+        month_pivot = df_p.pivot_table(index=[df_p['Date'].dt.year, df_p['Date'].dt.month], columns='Meter Model', values='Quantity', aggfunc='sum', fill_value=0)
+        month_pivot.index = [f"{int(y)}-{int(m)} сар" for y, m in month_pivot.index]
+        st.dataframe(month_pivot.sort_index(ascending=False), use_container_width=True)
 
-# --- 2. ГРАФИК ---
+# --- 2. ГРАФИК (3 График) ---
 elif menu == "📈 График":
     st.header("📈 Үйлдвэрлэлийн шинжилгээ")
     df_p = st.session_state.prod_df.copy()
     if not df_p.empty:
         df_p['Date'] = pd.to_datetime(df_p['Date'])
-        today = datetime.date.today()
         
         st.subheader("📊 1. Сарын нийт үйлдвэрлэл")
         df_p['Month_Label'] = df_p['Date'].dt.strftime('%Y-%m')
-        m_data = df_p.groupby(['Month_Label', 'Meter Model'])['Quantity'].sum().unstack().fillna(0)
-        st.bar_chart(m_data)
+        st.bar_chart(df_p.groupby(['Month_Label', 'Meter Model'])['Quantity'].sum().unstack().fillna(0))
 
         st.divider()
-        st.subheader(f"📉 2. Өдөр тутмын явц ({today.month}-р сар)")
+        st.subheader("📉 2. Өдөр тутмын явц (Энэ сар)")
+        today = datetime.date.today()
         df_active = df_p[(df_p['Date'].dt.year == today.year) & (df_p['Date'].dt.month == today.month)]
         if not df_active.empty:
-            d_data = df_active.groupby(['Date', 'Meter Model'])['Quantity'].sum().unstack().fillna(0)
-            st.line_chart(d_data)
-        else:
-            st.info("Энэ сард бүртгэл байхгүй байна.")
+            st.line_chart(df_active.groupby(['Date', 'Meter Model'])['Quantity'].sum().unstack().fillna(0))
         
         st.divider()
-        st.subheader("📈 3. Нийт үйлдвэрлэлийн хуримтлагдсан өсөлт")
-        c_data = df_p.sort_values('Date').groupby('Date')['Quantity'].sum().cumsum()
-        st.area_chart(c_data)
-    else:
-        st.info("График харуулах өгөгдөл алга.")
+        st.subheader("📈 3. Нийт хуримтлагдсан өсөлт")
+        st.area_chart(df_p.sort_values('Date').groupby('Date')['Quantity'].sum().cumsum())
 
-# --- 3. АРХИВ ---
+# --- 3. АРХИВ (Нийт дүнтэй) ---
 elif menu == "🗄️ Архив":
     st.header("🗄️ Үйлдвэрлэлийн түүхэн архив")
     df_p = st.session_state.prod_df.copy()
@@ -158,120 +149,60 @@ elif menu == "🗄️ Архив":
 
         tab1, tab2 = st.tabs(["📅 Сарын тайлан", "📑 Өдрийн дэлгэрэнгүй"])
         with tab1:
-            # Pivot table үүсгэх
-            m_pivot = df_year.pivot_table(
-                index=df_year['Date'].dt.month, 
-                columns='Meter Model', 
-                values='Quantity', 
-                aggfunc='sum', 
-                fill_value=0
-            )
-            
-            # Мөр бүрийн хойно (Нийт) дүн нэмэх
+            m_pivot = df_year.pivot_table(index=df_year['Date'].dt.month, columns='Meter Model', values='Quantity', aggfunc='sum', fill_value=0)
             m_pivot['НИЙТ'] = m_pivot.sum(axis=1)
-            
-            # Багана бүрийн доор (Нийт) дүн нэмэх
-            # Мөрийн нэрийг "Сар" болгож өөрчлөх
             m_pivot.index = [f"{m} сар" for m in m_pivot.index]
-            
-            # Бүх баганын нийлбэрийг доор нь "НИЙТ ДҮН" гэж нэмэх
             total_row = m_pivot.sum().to_frame().T
             total_row.index = ["🔥🔥 НИЙТ ДҮН"]
-            
-            final_archive_df = pd.concat([m_pivot, total_row])
-            
-            st.write(f"### 🗓️ {sel_year} оны нэгтгэл дүн")
-            st.dataframe(final_archive_df, use_container_width=True)
-            
+            st.dataframe(pd.concat([m_pivot, total_row]), use_container_width=True)
         with tab2:
-            st.write(f"### 📑 {sel_year} оны бүх гүйлгээ")
-            st.dataframe(
-                df_year.sort_values(by="Date", ascending=False), 
-                use_container_width=True, 
-                hide_index=True
-            )
-    else:
-        st.info("Архив хоосон байна.")
+            st.dataframe(df_year.sort_values(by="Date", ascending=False), use_container_width=True, hide_index=True)
 
 # --- 4. БҮРТГЭЛ ---
 elif menu == "🏠 Бүртгэл":
-    st.header("🏭 Үйлдвэрлэлийн Бүртгэл & Түүх")
+    st.header("🏭 Үйлдвэрлэлийн Бүртгэл")
     if is_admin:
-        edit_data = None
-        if st.session_state.editing_id is not None:
-            edit_data = st.session_state.prod_df[st.session_state.prod_df['ID'] == st.session_state.editing_id].iloc[0]
-            st.warning(f"ID: {st.session_state.editing_id} бүртгэлийг засаж байна.")
-
-        with st.container(border=True):
-            with st.form("prod_form", clear_on_submit=True):
-                c1, c2, c3 = st.columns([1, 2, 1])
-                d_val = c1.date_input("Огноо", edit_data['Date'] if edit_data is not None else datetime.date.today())
-                m_val = c2.selectbox("Марк", st.session_state.models)
-                q_val = c3.number_input("Тоо", min_value=1, value=int(edit_data['Quantity']) if edit_data is not None else 1)
-                
-                if st.form_submit_button("➕ Хадгалах/Бүртгэх", use_container_width=True, type="primary"):
-                    if edit_data is not None:
-                        idx = st.session_state.prod_df[st.session_state.prod_df['ID'] == st.session_state.editing_id].index[0]
-                        st.session_state.prod_df.loc[idx, ['Date', 'Meter Model', 'Quantity']] = [d_val, m_val, q_val]
-                        st.session_state.editing_id = None
-                    else:
-                        new_id = int(st.session_state.prod_df['ID'].max() + 1) if not st.session_state.prod_df.empty else 1
-                        new_row = pd.DataFrame({"ID":[new_id], "Date":[d_val], "Meter Model":[m_val], "Quantity":[q_val]})
-                        st.session_state.prod_df = pd.concat([st.session_state.prod_df, new_row], ignore_index=True)
-                    save_data(st.session_state.prod_df, DATA_FILE)
-                    st.rerun()
-    else:
-        st.info("ℹ️ Та 'Зөвхөн харах' горимд байна.")
-
+        with st.form("prod_form", clear_on_submit=True):
+            c1, c2, c3 = st.columns([1, 2, 1])
+            d_val = c1.date_input("Огноо", datetime.date.today())
+            m_val = c2.selectbox("Марк", st.session_state.models)
+            q_val = c3.number_input("Тоо", min_value=1, value=1)
+            if st.form_submit_button("➕ Бүртгэх", use_container_width=True, type="primary"):
+                new_id = int(st.session_state.prod_df['ID'].max() + 1) if not st.session_state.prod_df.empty else 1
+                new_row = pd.DataFrame({"ID":[new_id], "Date":[d_val], "Meter Model":[m_val], "Quantity":[q_val]})
+                st.session_state.prod_df = pd.concat([st.session_state.prod_df, new_row], ignore_index=True)
+                save_data(st.session_state.prod_df, DATA_FILE)
+                st.rerun()
+    
     st.divider()
-    df_view = st.session_state.prod_df.sort_values(by=["Date", "ID"], ascending=False)
-    for i, r in df_view.iterrows():
-        with st.expander(f"📅 {r['Date']} | {r['Meter Model']} | {int(r['Quantity'])} ш"):
-            if is_admin:
-                c1, c2 = st.columns(2)
-                if c1.button("📝 Засах", key=f"edit_{r['ID']}", use_container_width=True):
-                    st.session_state.editing_id = r['ID']
-                    st.rerun()
-                if c2.button("🗑️ Устгах", key=f"del_{r['ID']}", type="secondary", use_container_width=True):
-                    st.session_state.prod_df = st.session_state.prod_df[st.session_state.prod_df['ID'] != r['ID']]
-                    save_data(st.session_state.prod_df, DATA_FILE)
-                    st.rerun()
-            else:
-                st.write(f"ID: {r['ID']} | Огноо: {r['Date']} | Тоо: {int(r['Quantity'])} ш")
+    st.dataframe(st.session_state.prod_df.sort_values(by="Date", ascending=False), use_container_width=True, hide_index=True)
 
 # --- 5. НИЙЛҮҮЛЭЛТ ---
 elif menu == "📦 Нийлүүлэлт":
     st.header("📦 Нийлүүлэлтийн удирдлага")
-    df_c = st.session_state.contract_df.copy()
     if is_admin:
-        edited_df = st.data_editor(df_c, hide_index=True, use_container_width=True)
+        with st.expander("➕ Шинэ нийлүүлэлтийн огноо нэмэх"):
+            new_col = st.date_input("Огноо", datetime.date.today()).strftime("%Y-%m-%d")
+            if st.button("Багана нэмэх"):
+                if new_col not in st.session_state.contract_df.columns:
+                    st.session_state.contract_df[new_col] = 0
+                    save_data(st.session_state.contract_df, CONTRACT_FILE)
+                    st.rerun()
+        
+        edited_df = st.data_editor(st.session_state.contract_df, hide_index=True, use_container_width=True)
         if st.button("💾 Хадгалах"):
             st.session_state.contract_df = edited_df
             save_data(edited_df, CONTRACT_FILE)
             st.success("Хадгалагдлаа!")
     else:
-        st.dataframe(df_c, hide_index=True, use_container_width=True)
+        st.dataframe(st.session_state.contract_df, hide_index=True, use_container_width=True)
 
 # --- 6. ТОХИРГОО ---
 elif menu == "⚙️ Тохиргоо":
-    st.header("⚙️ Системийн тохиргоо")
+    st.header("⚙️ Тохиргоо")
     if is_admin:
-        with st.form("add_model", clear_on_submit=True):
-            new_model = st.text_input("Шинэ марк нэмэх:")
-            if st.form_submit_button("➕ Нэмэх"):
-                if new_model and new_model not in st.session_state.models:
-                    st.session_state.models.append(new_model)
-                    save_models(st.session_state.models)
-                    st.rerun()
-        
-        st.divider()
-        st.write("Одоо байгаа маркууд:")
-        for m in st.session_state.models:
-            c1, c2 = st.columns([4, 1])
-            c1.write(m)
-            if c2.button("🗑️", key=f"del_mod_{m}"):
-                st.session_state.models.remove(m)
-                save_models(st.session_state.models)
-                st.rerun()
-    else:
-        st.warning("⚠️ Тохиргоог өөрчлөх бол 'Засах эрх'-ийг идэвхжүүлнэ үү.")
+        new_m = st.text_input("Шинэ марк нэмэх:")
+        if st.button("Нэмэх"):
+            st.session_state.models.append(new_m)
+            save_models(st.session_state.models)
+            st.rerun()
