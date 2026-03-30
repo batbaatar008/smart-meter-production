@@ -118,34 +118,34 @@ with st.sidebar:
 
 # --- 2. НИЙЛҮҮЛЭЛТ ---
 elif menu == "📦 Нийлүүлэлт":
-st.header("📦 Нийлүүлэлтийн удирдлага")
-df_c = st.session_state.contract_df.copy()
-with st.expander("➕ Шинэ нийлүүлэлтийн багана нэмэх"):
-new_col_date = st.date_input("Огноо сонгох", datetime.date.today())
-if st.button("Багана нэмэх"):
-    date_str = new_col_date.strftime("%Y-%m-%d")
-    if date_str not in df_c.columns:
-        df_c[date_str] = 0
-        st.session_state.contract_df = df_c
-        save_data(df_c, CONTRACT_FILE)
-        st.rerun()
-edited_df = st.data_editor(df_c, hide_index=True)
-if st.button("💾 Хадгалах"):
-st.session_state.contract_df = edited_df
-save_data(edited_df, CONTRACT_FILE)
-st.success("Хадгалагдлаа!")
+    st.header("📦 Нийлүүлэлтийн удирдлага")
+    df_c = st.session_state.contract_df.copy()
+    with st.expander("➕ Шинэ нийлүүлэлтийн багана нэмэх"):
+    new_col_date = st.date_input("Огноо сонгох", datetime.date.today())
+    if st.button("Багана нэмэх"):
+        date_str = new_col_date.strftime("%Y-%m-%d")
+        if date_str not in df_c.columns:
+            df_c[date_str] = 0
+            st.session_state.contract_df = df_c
+            save_data(df_c, CONTRACT_FILE)
+            st.rerun()
+    edited_df = st.data_editor(df_c, hide_index=True)
+    if st.button("💾 Хадгалах"):
+    st.session_state.contract_df = edited_df
+    save_data(edited_df, CONTRACT_FILE)
+    st.success("Хадгалагдлаа!")
 
 # --- 3. ГРАФИК ---
 elif menu == "📈 График":
-st.header("📈 Үйлдвэрлэлийн шинжилгээ")
-df_p = st.session_state.prod_df.copy()
-if not df_p.empty:
-df_p['Date'] = pd.to_datetime(df_p['Date'])
-today = datetime.date.today()
-
-# 1. САРЫН НИЙТ (Баганан график)
-st.subheader("📊 1. Сарын нийт үйлдвэрлэл (Бүх хугацаа)")
-df_p['Month_Label'] = df_p['Date'].dt.strftime('%Y-%m')
+    st.header("📈 Үйлдвэрлэлийн шинжилгээ")
+    df_p = st.session_state.prod_df.copy()
+    if not df_p.empty:
+    df_p['Date'] = pd.to_datetime(df_p['Date'])
+    today = datetime.date.today()
+    
+    # 1. САРЫН НИЙТ (Баганан график)
+    st.subheader("📊 1. Сарын нийт үйлдвэрлэл (Бүх хугацаа)")
+    df_p['Month_Label'] = df_p['Date'].dt.strftime('%Y-%m')
 m_data = df_p.groupby(['Month_Label', 'Meter Model'])['Quantity'].sum().unstack().fillna(0)
 st.bar_chart(m_data)
 
