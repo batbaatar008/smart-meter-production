@@ -49,7 +49,7 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
     
-    is_admin = st.toggle("🛠️ Засах эрх идэвхүүлэх", value=False)
+    is_admin = st.toggle("🛠️ Засах эрх идэвхжүүлэх", value=False)
     st.divider()
     menu = st.radio("Үндсэн цэс:", ["📋 Тайлан", "📈 График", "🗄️ Архив", "🏠 Бүртгэл", "📦 Нийлүүлэлт", "⚙️ Тохиргоо"])
     st.divider()
@@ -65,7 +65,6 @@ if menu == "📋 Тайлан":
         df_p['Date'] = pd.to_datetime(df_p['Date'])
         supply_cols = [c for c in df_c.columns if c != "Марк"]
         
-        # --- 1. САРЫН ЗАДАРГАА ---
         st.subheader("📅 1. Сарын үйлдвэрлэлийн задаргаа")
         available_years = sorted(df_p['Date'].dt.year.unique(), reverse=True)
         report_year = st.selectbox("Тайлан үзэх он сонгох:", available_years)
@@ -80,8 +79,6 @@ if menu == "📋 Тайлан":
             st.dataframe(pd.concat([m_pivot, total_row]), use_container_width=True)
         
         st.divider()
-
-        # --- 2. ОНЫ ГҮЙЦЭТГЭЛ (ХӨЛ ДҮНТЭЙ) ---
         st.subheader("📊 2. Оны гүйцэтгэл болон Дамнасан үлдэгдэл")
         co_year = st.selectbox("Carry-over тооцох он:", available_years, key="co_y")
         
@@ -98,25 +95,15 @@ if menu == "📋 Тайлан":
             t_sup = df_c[df_c['Марк'] == model][this_cols].sum(axis=1).values[0] if this_cols else 0
             t_prod = curr_prod.get(model, 0)
             co_data.append({
-                "Марк": model, 
-                "Өмнөх оны үлдэгдэл": carry_over, 
-                "Шинэ нийлүүлэлт": t_sup, 
-                "Нийт боломжит": carry_over + t_sup, 
-                "Үйлдвэрлэсэн": t_prod, 
-                "Эцсийн үлдэгдэл": (carry_over + t_sup) - t_prod
+                "Марк": model, "Өмнөх оны үлдэгдэл": carry_over, "Шинэ нийлүүлэлт": t_sup, 
+                "Нийт боломжит": carry_over + t_sup, "Үйлдвэрлэсэн": t_prod, "Эцсийн үлдэгдэл": (carry_over + t_sup) - t_prod
             })
-        
         df_co = pd.DataFrame(co_data)
-        # Хөл дүн тооцох
-        if not df_co.empty:
-            co_totals = df_co.select_dtypes(include=['number']).sum().to_frame().T
-            co_totals["Марк"] = "🔥🔥 НИЙТ"
-            df_co_final = pd.concat([df_co, co_totals], ignore_index=True)
-            st.dataframe(df_co_final, use_container_width=True, hide_index=True)
+        co_totals = df_co.select_dtypes(include=['number']).sum().to_frame().T
+        co_totals["Марк"] = "🔥🔥 НИЙТ"
+        st.dataframe(pd.concat([df_co, co_totals], ignore_index=True), use_container_width=True, hide_index=True)
 
         st.divider()
-
-        # --- 3. НИЙТ НИЙЛҮҮЛЭЛТ (ХӨЛ ДҮНТЭЙ) ---
         st.subheader("📦 3. Нийт Нийлүүлэлт болон Үлдэгдэл")
         total_supply = df_c[supply_cols].sum(axis=1)
         total_produced = df_p.groupby("Meter Model")["Quantity"].sum()
@@ -126,12 +113,9 @@ if menu == "📋 Тайлан":
             "Нийт Үйлдвэрлэсэн": df_c["Марк"].map(total_produced).fillna(0),
         })
         all_report["Үлдэгдэл"] = all_report["Нийт Нийлүүлэлт"] - all_report["Нийт Үйлдвэрлэсэн"]
-        
-        # Хөл дүн тооцох
         all_totals = all_report.select_dtypes(include=['number']).sum().to_frame().T
         all_totals["Марк"] = "🔥🔥 НИЙТ"
-        all_report_final = pd.concat([all_report, all_totals], ignore_index=True)
-        st.dataframe(all_report_final, use_container_width=True, hide_index=True)
+        st.dataframe(pd.concat([all_report, all_totals], ignore_index=True), use_container_width=True, hide_index=True)
 
 # --- 2. ГРАФИК ---
 elif menu == "📈 График":
@@ -176,7 +160,7 @@ elif menu == "🗄️ Архив":
         with t2:
             st.dataframe(df_yr.sort_values('Date', ascending=False), use_container_width=True, hide_index=True)
 
-# --- 4. БҮРТГЭЛ ---
+# --- 4. БҮРТГЭЛ (Засах, Устгах функцтэй) ---
 elif menu == "🏠 Бүртгэл":
     st.header("🏭 Үйлдвэрлэлийн Бүртгэл")
     if is_admin:
@@ -208,6 +192,7 @@ elif menu == "🏠 Бүртгэл":
             st.rerun()
 
     st.divider()
+    # Жагсаалтыг харуулах
     for _, r in st.session_state.prod_df.sort_values(by="Date", ascending=False).iterrows():
         with st.expander(f"📅 {r['Date']} | {r['Meter Model']} | {int(r['Quantity'])} ш"):
             if is_admin:
@@ -220,7 +205,7 @@ elif menu == "🏠 Бүртгэл":
                     save_data(st.session_state.prod_df, DATA_FILE)
                     st.rerun()
 
-# --- 5. НИЙЛҮҮЛЭЛТ ---
+# --- 5. НИЙЛҮҮЛЭЛТ (Багана нэмэх, Засах) ---
 elif menu == "📦 Нийлүүлэлт":
     st.header("📦 Нийлүүлэлтийн удирдлага")
     if is_admin:
@@ -231,6 +216,7 @@ elif menu == "📦 Нийлүүлэлт":
                     st.session_state.contract_df[new_col] = 0
                     save_data(st.session_state.contract_df, CONTRACT_FILE)
                     st.rerun()
+        
         edited = st.data_editor(st.session_state.contract_df, hide_index=True, use_container_width=True)
         if st.button("💾 Хадгалах"):
             st.session_state.contract_df = edited
@@ -239,13 +225,14 @@ elif menu == "📦 Нийлүүлэлт":
     else:
         st.dataframe(st.session_state.contract_df, hide_index=True, use_container_width=True)
 
-# --- 6. ТОХИРГОО ---
+# --- 6. ТОХИРГОО (Марк нэмэх, устгах, нэр засах) ---
 elif menu == "⚙️ Тохиргоо":
     st.header("⚙️ Системийн тохиргоо")
     if is_admin:
         st.subheader("📋 Тоолуурын марк удирдах")
         curr_m = load_models()
         
+        # Марк засах (Rename) хэсэг
         if st.session_state.rename_model_target:
             st.info(f"Засаж буй: **{st.session_state.rename_model_target}**")
             new_name = st.text_input("Шинэ нэр:", value=st.session_state.rename_model_target)
@@ -253,6 +240,7 @@ elif menu == "⚙️ Тохиргоо":
             if c1.button("✅ Хадгалах", type="primary"):
                 if new_name and new_name != st.session_state.rename_model_target:
                     old = st.session_state.rename_model_target
+                    # Файлуудыг шинэчлэх
                     new_list = [new_name if m == old else m for m in curr_m]
                     pd.DataFrame({"Model": new_list}).to_csv(MODELS_FILE, index=False)
                     st.session_state.prod_df['Meter Model'] = st.session_state.prod_df['Meter Model'].replace(old, new_name)
@@ -260,7 +248,7 @@ elif menu == "⚙️ Тохиргоо":
                     st.session_state.contract_df['Марк'] = st.session_state.contract_df['Марк'].replace(old, new_name)
                     save_data(st.session_state.contract_df, CONTRACT_FILE)
                     st.session_state.rename_model_target = None
-                    st.success("Шинэчлэгдлээ!")
+                    st.success("Амжилттай шинэчлэгдлээ!")
                     st.rerun()
             if c2.button("❌ Цуцлах"):
                 st.session_state.rename_model_target = None
@@ -290,3 +278,5 @@ elif menu == "⚙️ Тохиргоо":
                 st.session_state.contract_df = st.session_state.contract_df[st.session_state.contract_df['Марк'] != m]
                 save_data(st.session_state.contract_df, CONTRACT_FILE)
                 st.rerun()
+    else:
+        st.warning("Засах эрхийг идэвхжүүлж байж тохиргоог өөрчлөх боломжтой.")
