@@ -143,11 +143,38 @@ elif menu == "🗄️ Архив":
 
         tab1, tab2 = st.tabs(["📅 Сарын тайлан", "📑 Өдрийн дэлгэрэнгүй"])
         with tab1:
-            m_pivot = df_year.pivot_table(index=df_year['Date'].dt.month, columns='Meter Model', values='Quantity', aggfunc='sum', fill_value=0)
+            # Pivot table үүсгэх
+            m_pivot = df_year.pivot_table(
+                index=df_year['Date'].dt.month, 
+                columns='Meter Model', 
+                values='Quantity', 
+                aggfunc='sum', 
+                fill_value=0
+            )
+            
+            # Мөр бүрийн хойно (Нийт) дүн нэмэх
+            m_pivot['НИЙТ'] = m_pivot.sum(axis=1)
+            
+            # Багана бүрийн доор (Нийт) дүн нэмэх
+            # Мөрийн нэрийг "Сар" болгож өөрчлөх
             m_pivot.index = [f"{m} сар" for m in m_pivot.index]
-            st.dataframe(m_pivot, use_container_width=True)
+            
+            # Бүх баганын нийлбэрийг доор нь "НИЙТ ДҮН" гэж нэмэх
+            total_row = m_pivot.sum().to_frame().T
+            total_row.index = ["🔥🔥 НИЙТ ДҮН"]
+            
+            final_archive_df = pd.concat([m_pivot, total_row])
+            
+            st.write(f"### 🗓️ {sel_year} оны нэгтгэл дүн")
+            st.dataframe(final_archive_df, use_container_width=True)
+            
         with tab2:
-            st.dataframe(df_year.sort_values(by="Date", ascending=False), use_container_width=True, hide_index=True)
+            st.write(f"### 📑 {sel_year} оны бүх гүйлгээ")
+            st.dataframe(
+                df_year.sort_values(by="Date", ascending=False), 
+                use_container_width=True, 
+                hide_index=True
+            )
     else:
         st.info("Архив хоосон байна.")
 
