@@ -71,36 +71,51 @@ with st.sidebar:
 # --- 1. ТАЙЛАН ---
 if menu == "📋 Тайлан":
     st.header("📋 Жилийн нэгтгэл тайлан")
+    
     df_p = st.session_state.prod_df.copy()
     df_c = st.session_state.contract_df.copy()
+    
+    # 1. Он сонгох (Шүүлтүүр)
+    available_years = sorted(list(set(pd.to_datetime(df_p['Date']).dt.year) | {datetime.date.today().year}), reverse=True)
+    selected_year = st.selectbox("Тайлан харах он сонгох:", available_years)
 
     if not df_p.empty:
         df_p['Date'] = pd.to_datetime(df_p['Date'])
+        df_p['Year'] = df_p['Date'].dt.year
         
-        st.subheader("📅 Сарын үйлдвэрлэлийн нэгтгэл")
-        month_pivot = df_p.pivot_table(index=[df_p['Date'].dt.year, df_p['Date'].dt.month], columns='Meter Model', values='Quantity', aggfunc='sum', fill_value=0)
-        month_pivot = month_pivot.sort_index(ascending=False)
-        month_pivot.index = [f"{int(y)}-{int(m)} сар" for y, m in month_pivot.index]
-        month_pivot['НИЙТ'] = month_pivot.sum(axis=1)
-        st.dataframe(month_pivot, use_container_width=True)
+        # --- ӨМНӨХ ОНООС ШИЛЖИЖ ИРСЭН ҮЛДЭГДЭЛ ТООЦОХ ---
+        # Өмнөх онуудын нийт нийлүүлэлт
+        prev_years_supply_cols = [col for col in df_c.columns if col != "Марк" and int(col[:4]) < selected_year]
+        prev_supply = df_c[prev_years_supply_cols].sum(axis=1) if prev_years_supply_cols else 0
+        
+        # Өмнөх онуудын нийт үйлдвэрлэл
+        prev_production = df_p[df_p['Year'] < selected_year].groupby("Meter Model")["Quantity"].sum()
+        
+        # Шилжиж ирсэн үлдэгдэл (Carry-over)
+        carry_over = pd.DataFrame(index=df_c["Марк"])
+        carry_over['Өмнөх оны үлдэгдэл'] = prev_supply - carry_over.index.map(prev_production).fillna(0)
 
-        st.divider()
-        st.subheader("🗓️ Үйлдвэрлэл оноор")
-        year_pivot = df_p.pivot_table(index=df_p['Date'].dt.year, columns='Meter Model', values='Quantity', aggfunc='sum', fill_value=0)
-        year_pivot['НИЙТ'] = year_pivot.sum(axis=1)
-        st.dataframe(year_pivot, use_container_width=True)
-
-        st.divider()
-        st.subheader("📦 Нийлүүлэлт болон Үлдэгдэл")
-        supply_cols = [c for c in df_c.columns if c != "Марк"]
-        df_c['Нийт Нийлүүлэлт'] = df_c[supply_cols].sum(axis=1)
-        prod_sum = df_p.groupby("Meter Model")["Quantity"].sum().reset_index()
-        prod_sum.columns = ["Марк", "Үйлдвэрлэсэн"]
-        final = pd.merge(df_c[['Марк', 'Нийт Нийлүүлэлт']], prod_sum, on="Марк", how="left").fillna(0)
-        final["Үлдэгдэл"] = final["Нийт Нийлүүлэлт"] - final["Үйлдвэрлэсэн"]
-        st.dataframe(final, use_container_width=True, hide_index=True)
-    else:
-        st.warning("Мэдээлэл олдсонгүй.")
+        # --- ТУХАЙН ОНЫ ТАЙЛАН ---
+        st.subheader(f"📅 {selected_year} оны гүйцэтгэл")
+        
+        # Тухайн оны нийлүүлэлтийн баганууд
+        this_year_supply_cols = [col for col in df_c.columns if col != "Марк" and int(col[:4]) == selected_year]
+        current_supply = df_c[this_year_supply_cols].sum(axis=1) if this_year_supply_cols else 0
+        
+        # Тухайн оны үйлдвэрлэл
+        current_prod = df_p[df_p['Year'] == selected_year].groupby("Meter Model")["Quantity"].sum()
+        
+        # Нэгтгэл хүснэгт
+        report_df = pd.DataFrame({
+            "Марк": df_c["Марк"],
+            "Өмнөх оны үлдэгдэл": carry_over['Өмнөх оны үлдэгдэл'].values,
+            "Шинэ нийлүүлэлт": current_supply,
+            "Нийт боломжит": carry_over['Өмнөх оны үлдэгдэл'].values + current_supply,
+            "Үйлдвэрлэсэн": report_df["Марк"].map(current_prod).fillna(0),
+        })
+        report_df["Эцсийн үлдэгдэл"] = report_df["Нийт боломжит"] - report_df["Үйлдвэрлэсэн"]
+        
+        st.dataframe(report_df, use_container_width=True, hide_index=True)
 
 # --- 2. ГРАФИК ---
 elif menu == "📈 График":
