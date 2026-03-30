@@ -55,7 +55,7 @@ with st.sidebar:
     st.divider()
     st.caption("Зохиогч С.БАТБААТАР | 2026")
 
-# --- 1. ТАЙЛАН ---
+# --- 1. ТАЙЛАН (Алдаа засагдсан хэсэг) ---
 if menu == "📋 Тайлан":
     st.header("📋 Үйлдвэрлэлийн нэгтгэл тайлан")
     df_p = st.session_state.prod_df.copy()
@@ -63,6 +63,7 @@ if menu == "📋 Тайлан":
     
     if not df_p.empty:
         df_p['Date'] = pd.to_datetime(df_p['Date'])
+        # Зөвхөн огноотой (тоон утгатай) багануудыг шүүж авах
         supply_cols = [c for c in df_c.columns if c != "Марк"]
         
         st.subheader("📅 1. Сарын үйлдвэрлэлийн задаргаа")
@@ -84,8 +85,10 @@ if menu == "📋 Тайлан":
         
         prev_prod = df_p[df_p['Date'].dt.year < co_year].groupby("Meter Model")["Quantity"].sum()
         curr_prod = df_p[df_p['Date'].dt.year == co_year].groupby("Meter Model")["Quantity"].sum()
-        prev_cols = [c for c in supply_cols if c.isdigit() and int(c[:4]) < co_year]
-        this_cols = [c for c in supply_cols if c.isdigit() and int(c[:4]) == co_year]
+        
+        # ЭНД ЗАСВАР ОРОВ: Баганын нэр тоо мөн эсэхийг шалгана
+        prev_cols = [c for c in supply_cols if c.split('-')[0].isdigit() and int(c.split('-')[0]) < co_year]
+        this_cols = [c for c in supply_cols if c.split('-')[0].isdigit() and int(c.split('-')[0]) == co_year]
         
         co_data = []
         for model in load_models():
@@ -217,14 +220,13 @@ elif menu == "📦 Нийлүүлэлт":
     else:
         st.dataframe(st.session_state.contract_df, hide_index=True, use_container_width=True)
 
-# --- 6. ТОХИРГОО (Марк засах хэсэг энд бүрэн байгаа) ---
+# --- 6. ТОХИРГОО ---
 elif menu == "⚙️ Тохиргоо":
     st.header("⚙️ Системийн тохиргоо")
     if is_admin:
         st.subheader("📋 Тоолуурын марк удирдах")
         curr_m = load_models()
         
-        # --- МАРК ЗАСАХ (RENAME) ХЭСЭГ ---
         if st.session_state.rename_model_target:
             st.info(f"Засаж буй: **{st.session_state.rename_model_target}**")
             new_name = st.text_input("Шинэ нэр:", value=st.session_state.rename_model_target)
@@ -232,16 +234,12 @@ elif menu == "⚙️ Тохиргоо":
             if c1.button("✅ Хадгалах", type="primary"):
                 if new_name and new_name != st.session_state.rename_model_target:
                     old = st.session_state.rename_model_target
-                    # 1. Models update
                     new_list = [new_name if m == old else m for m in curr_m]
                     pd.DataFrame({"Model": new_list}).to_csv(MODELS_FILE, index=False)
-                    # 2. Production data update
                     st.session_state.prod_df['Meter Model'] = st.session_state.prod_df['Meter Model'].replace(old, new_name)
                     save_data(st.session_state.prod_df, DATA_FILE)
-                    # 3. Contract data update
                     st.session_state.contract_df['Марк'] = st.session_state.contract_df['Марк'].replace(old, new_name)
                     save_data(st.session_state.contract_df, CONTRACT_FILE)
-                    
                     st.session_state.rename_model_target = None
                     st.success("Шинэчлэгдлээ!")
                     st.rerun()
@@ -273,5 +271,3 @@ elif menu == "⚙️ Тохиргоо":
                 st.session_state.contract_df = st.session_state.contract_df[st.session_state.contract_df['Марк'] != m]
                 save_data(st.session_state.contract_df, CONTRACT_FILE)
                 st.rerun()
-    else:
-        st.warning("Засах эрхээ идэвхжүүлнэ үү.")
