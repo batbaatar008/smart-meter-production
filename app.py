@@ -52,6 +52,8 @@ with st.sidebar:
 # --- 1. БҮРТГЭЛ ---
 if menu == "🏠 Бүртгэл":
     st.header("🏭 Үйлдвэрлэлийн Бүртгэл & Түүх засах")
+    
+    # Бүртгэл хийх хэсэг
     edit_data = None
     if st.session_state.editing_id is not None:
         edit_data = st.session_state.prod_df[st.session_state.prod_df['ID'] == st.session_state.editing_id].iloc[0]
@@ -78,17 +80,40 @@ if menu == "🏠 Бүртгэл":
 
     st.divider()
     st.subheader("🔍 Сүүлийн бүртгэлүүд")
+
+    # --- ГҮЙЛГЭДЭГ ХЭСЭГ (SCROLLABLE AREA) ---
+    # CSS ашиглан 400px өндөртэй, гүйлгэдэг хайрцаг үүсгэх
+    st.markdown("""
+        <style>
+        .scroll-container {
+            height: 450px;
+            overflow-y: scroll;
+            padding: 10px;
+            border: 1px solid #e6e9ef;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # Жагсаалтыг шүүж харуулах
     df_view = st.session_state.prod_df.sort_values(by="Date", ascending=False)
-    for i, r in df_view.head(20).iterrows():
-        with st.expander(f"📅 {r['Date']} | {r['Meter Model']} | {int(r['Quantity'])} ш"):
-            c1, c2 = st.columns(2)
-            if c1.button("📝 Засах", key=f"edit_{r['ID']}"):
-                st.session_state.editing_id = r['ID']
-                st.rerun()
-            if c2.button("🗑️ Устгах", key=f"del_{r['ID']}"):
-                st.session_state.prod_df = st.session_state.prod_df[st.session_state.prod_df['ID'] != r['ID']]
-                save_data(st.session_state.prod_df, DATA_FILE)
-                st.rerun()
+    
+    # Scroll дотор бүртгэлүүдийг байршуулах
+    with st.container():
+        # Streamlit-ийн 'st.container' дотор scroll хийхэд зориулж 'height' өгөх боломжтой байдаг
+        with st.container(height=500):
+            for i, r in df_view.iterrows():
+                # Expander бүрийг хайрцаг дотор өнгөөр ялгаж харуулбал илүү гоё
+                with st.expander(f"📅 {r['Date']} | {r['Meter Model']} | {int(r['Quantity'])} ш"):
+                    c1, c2 = st.columns(2)
+                    if c1.button("📝 Засах", key=f"edit_{r['ID']}", use_container_width=True):
+                        st.session_state.editing_id = r['ID']
+                        st.rerun()
+                    if c2.button("🗑️ Устгах", key=f"del_{r['ID']}", type="secondary", use_container_width=True):
+                        st.session_state.prod_df = st.session_state.prod_df[st.session_state.prod_df['ID'] != r['ID']]
+                        save_data(st.session_state.prod_df, DATA_FILE)
+                        st.rerun()
 
 # --- 2. НИЙЛҮҮЛЭЛТ ---
 elif menu == "📦 Нийлүүлэлт":
