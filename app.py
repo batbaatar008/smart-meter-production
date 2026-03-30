@@ -118,125 +118,125 @@ with st.sidebar:
 
 # --- 2. НИЙЛҮҮЛЭЛТ ---
 elif menu == "📦 Нийлүүлэлт":
-    st.header("📦 Нийлүүлэлтийн удирдлага")
-    df_c = st.session_state.contract_df.copy()
-    with st.expander("➕ Шинэ нийлүүлэлтийн багана нэмэх"):
-        new_col_date = st.date_input("Огноо сонгох", datetime.date.today())
-        if st.button("Багана нэмэх"):
-            date_str = new_col_date.strftime("%Y-%m-%d")
-            if date_str not in df_c.columns:
-                df_c[date_str] = 0
-                st.session_state.contract_df = df_c
-                save_data(df_c, CONTRACT_FILE)
-                st.rerun()
-    edited_df = st.data_editor(df_c, hide_index=True)
-    if st.button("💾 Хадгалах"):
-        st.session_state.contract_df = edited_df
-        save_data(edited_df, CONTRACT_FILE)
-        st.success("Хадгалагдлаа!")
+st.header("📦 Нийлүүлэлтийн удирдлага")
+df_c = st.session_state.contract_df.copy()
+with st.expander("➕ Шинэ нийлүүлэлтийн багана нэмэх"):
+new_col_date = st.date_input("Огноо сонгох", datetime.date.today())
+if st.button("Багана нэмэх"):
+    date_str = new_col_date.strftime("%Y-%m-%d")
+    if date_str not in df_c.columns:
+        df_c[date_str] = 0
+        st.session_state.contract_df = df_c
+        save_data(df_c, CONTRACT_FILE)
+        st.rerun()
+edited_df = st.data_editor(df_c, hide_index=True)
+if st.button("💾 Хадгалах"):
+st.session_state.contract_df = edited_df
+save_data(edited_df, CONTRACT_FILE)
+st.success("Хадгалагдлаа!")
 
 # --- 3. ГРАФИК ---
 elif menu == "📈 График":
-    st.header("📈 Үйлдвэрлэлийн шинжилгээ")
-    df_p = st.session_state.prod_df.copy()
-    if not df_p.empty:
-        df_p['Date'] = pd.to_datetime(df_p['Date'])
-        today = datetime.date.today()
-        
-        # 1. САРЫН НИЙТ (Баганан график)
-        st.subheader("📊 1. Сарын нийт үйлдвэрлэл (Бүх хугацаа)")
-        df_p['Month_Label'] = df_p['Date'].dt.strftime('%Y-%m')
-        m_data = df_p.groupby(['Month_Label', 'Meter Model'])['Quantity'].sum().unstack().fillna(0)
-        st.bar_chart(m_data)
-        
-        st.divider()
+st.header("📈 Үйлдвэрлэлийн шинжилгээ")
+df_p = st.session_state.prod_df.copy()
+if not df_p.empty:
+df_p['Date'] = pd.to_datetime(df_p['Date'])
+today = datetime.date.today()
 
-        # 2. ОДООГИЙН САРЫН ӨДӨР ТУТМЫН ЯВЦ (Шугаман график)
-        st.subheader(f"📉 2. {today.year} оны {today.month}-р сарын өдөр тутмын явц")
-        df_active = df_p[(df_p['Date'].dt.year == today.year) & (df_p['Date'].dt.month == today.month)]
-        if not df_active.empty:
-            d_data = df_active.groupby(['Date', 'Meter Model'])['Quantity'].sum().unstack().fillna(0)
-            d_data.index = d_data.index.date
-            st.line_chart(d_data)
-        else:
-            st.info(f"{today.month}-р сард одоогоор бүртгэл ороогүй байна.")
+# 1. САРЫН НИЙТ (Баганан график)
+st.subheader("📊 1. Сарын нийт үйлдвэрлэл (Бүх хугацаа)")
+df_p['Month_Label'] = df_p['Date'].dt.strftime('%Y-%m')
+m_data = df_p.groupby(['Month_Label', 'Meter Model'])['Quantity'].sum().unstack().fillna(0)
+st.bar_chart(m_data)
 
-        st.divider()
+st.divider()
 
-        # 3. НИЙТ ХУРИМТЛАГДСАН ӨСӨЛТ (Жилийн нийт явц)
-        st.subheader("📈 3. Нийт үйлдвэрлэлийн хуримтлагдсан өсөлт (Жил дамнан)")
-        # Огноогоор эрэмбэлж, нийт дүнг хуримтлуулж бодно
-        df_sorted = df_p.sort_values('Date')
-        c_data = df_sorted.groupby('Date')['Quantity'].sum().cumsum()
-        st.area_chart(c_data)
-        
-    else:
-        st.info("График харуулах өгөгдөл алга.")
+# 2. ОДООГИЙН САРЫН ӨДӨР ТУТМЫН ЯВЦ (Шугаман график)
+st.subheader(f"📉 2. {today.year} оны {today.month}-р сарын өдөр тутмын явц")
+df_active = df_p[(df_p['Date'].dt.year == today.year) & (df_p['Date'].dt.month == today.month)]
+if not df_active.empty:
+    d_data = df_active.groupby(['Date', 'Meter Model'])['Quantity'].sum().unstack().fillna(0)
+    d_data.index = d_data.index.date
+    st.line_chart(d_data)
+else:
+    st.info(f"{today.month}-р сард одоогоор бүртгэл ороогүй байна.")
+
+st.divider()
+
+# 3. НИЙТ ХУРИМТЛАГДСАН ӨСӨЛТ (Жилийн нийт явц)
+st.subheader("📈 3. Нийт үйлдвэрлэлийн хуримтлагдсан өсөлт (Жил дамнан)")
+# Огноогоор эрэмбэлж, нийт дүнг хуримтлуулж бодно
+df_sorted = df_p.sort_values('Date')
+c_data = df_sorted.groupby('Date')['Quantity'].sum().cumsum()
+st.area_chart(c_data)
+
+else:
+st.info("График харуулах өгөгдөл алга.")
 
 # --- 4. ТАЙЛАН (ЗАСВАР ОРСОН ХЭСЭГ) ---
 elif menu == "📋 Тайлан":
-    st.header("📋 Жилийн нэгтгэл тайлан")
-    df_p = st.session_state.prod_df.copy()
-    df_c = st.session_state.contract_df.copy()
+st.header("📋 Жилийн нэгтгэл тайлан")
+df_p = st.session_state.prod_df.copy()
+df_c = st.session_state.contract_df.copy()
 
-    if not df_p.empty:
-        df_p['Date'] = pd.to_datetime(df_p['Date'])
-        df_p['Year'] = df_p['Date'].dt.year
-        df_p['Month'] = df_p['Date'].dt.month
+if not df_p.empty:
+df_p['Date'] = pd.to_datetime(df_p['Date'])
+df_p['Year'] = df_p['Date'].dt.year
+df_p['Month'] = df_p['Date'].dt.month
 
-        # 1. Бүх хугацааны сарын нэгтгэл (Өмнөх шиг)
-        st.subheader("📅 Бүх сарын үйлдвэрлэлийн нэгтгэл")
-        # Он, сараар нэгтгэх
-        month_pivot = df_p.pivot_table(index=['Year', 'Month'], columns='Meter Model', values='Quantity', aggfunc='sum', fill_value=0)
-        # Индексийг гоё болгох (жишээ нь: 2026-3 сар)
-        month_pivot.index = [f"{int(y)}-{int(m)} сар" for y, m in month_pivot.index]
-        
-        # Нийт дүн нэмэх
-        month_pivot.loc['НИЙТ ДҮН'] = month_pivot.sum()
-        month_pivot['НИЙТ'] = month_pivot.sum(axis=1)
-        st.dataframe(month_pivot, use_container_width=True)
+# 1. Бүх хугацааны сарын нэгтгэл (Өмнөх шиг)
+st.subheader("📅 Бүх сарын үйлдвэрлэлийн нэгтгэл")
+# Он, сараар нэгтгэх
+month_pivot = df_p.pivot_table(index=['Year', 'Month'], columns='Meter Model', values='Quantity', aggfunc='sum', fill_value=0)
+# Индексийг гоё болгох (жишээ нь: 2026-3 сар)
+month_pivot.index = [f"{int(y)}-{int(m)} сар" for y, m in month_pivot.index]
 
-        st.divider()
+# Нийт дүн нэмэх
+month_pivot.loc['НИЙТ ДҮН'] = month_pivot.sum()
+month_pivot['НИЙТ'] = month_pivot.sum(axis=1)
+st.dataframe(month_pivot, use_container_width=True)
 
-        # 2. Жилийн тайлан
-        st.subheader("🗓️ Үйлдвэрлэл оноор")
-        year_pivot = df_p.pivot_table(index='Year', columns='Meter Model', values='Quantity', aggfunc='sum', fill_value=0)
-        year_pivot.loc['НИЙТ ДҮН'] = year_pivot.sum()
-        year_pivot['НИЙТ'] = year_pivot.sum(axis=1)
-        st.dataframe(year_pivot, use_container_width=True)
+st.divider()
 
-        st.divider()
+# 2. Жилийн тайлан
+st.subheader("🗓️ Үйлдвэрлэл оноор")
+year_pivot = df_p.pivot_table(index='Year', columns='Meter Model', values='Quantity', aggfunc='sum', fill_value=0)
+year_pivot.loc['НИЙТ ДҮН'] = year_pivot.sum()
+year_pivot['НИЙТ'] = year_pivot.sum(axis=1)
+st.dataframe(year_pivot, use_container_width=True)
 
-        # 3. Үлдэгдлийн хяналт
-        st.subheader("📦 Нийт нийлүүлэлт болон Үлдэгдэл")
-        supply_cols = [c for c in df_c.columns if c != "Марк"]
-        df_c['Нийт Нийлүүлэлт'] = df_c[supply_cols].sum(axis=1)
-        prod_sum = df_p.groupby("Meter Model")["Quantity"].sum().reset_index()
-        prod_sum.columns = ["Марк", "Үйлдвэрлэсэн"]
-        final = pd.merge(df_c[['Марк', 'Нийт Нийлүүлэлт']], prod_sum, on="Марк", how="left").fillna(0)
-        final["Үлдэгдэл"] = final["Нийт Нийлүүлэлт"] - final["Үйлдвэрлэсэн"]
-        final.loc[len(final)] = ["НИЙТ ДҮН", final['Нийт Нийлүүлэлт'].sum(), final['Үйлдвэрлэсэн'].sum(), final['Үлдэгдэл'].sum()]
-        st.dataframe(final, use_container_width=True, hide_index=True)
-    else:
-        st.warning("Тайлан гаргах өгөгдөл олдсонгүй.")
+st.divider()
+
+# 3. Үлдэгдлийн хяналт
+st.subheader("📦 Нийт нийлүүлэлт болон Үлдэгдэл")
+supply_cols = [c for c in df_c.columns if c != "Марк"]
+df_c['Нийт Нийлүүлэлт'] = df_c[supply_cols].sum(axis=1)
+prod_sum = df_p.groupby("Meter Model")["Quantity"].sum().reset_index()
+prod_sum.columns = ["Марк", "Үйлдвэрлэсэн"]
+final = pd.merge(df_c[['Марк', 'Нийт Нийлүүлэлт']], prod_sum, on="Марк", how="left").fillna(0)
+final["Үлдэгдэл"] = final["Нийт Нийлүүлэлт"] - final["Үйлдвэрлэсэн"]
+final.loc[len(final)] = ["НИЙТ ДҮН", final['Нийт Нийлүүлэлт'].sum(), final['Үйлдвэрлэсэн'].sum(), final['Үлдэгдэл'].sum()]
+st.dataframe(final, use_container_width=True, hide_index=True)
+else:
+st.warning("Тайлан гаргах өгөгдөл олдсонгүй.")
 
 # --- 5. АРХИВ ---
 elif menu == "🗄️ Архив":
-    st.header("🗄️ Үйлдвэрлэлийн түүхэн архив")
-    df_p = st.session_state.prod_df.copy()
-    if not df_p.empty:
-        df_p['Date'] = pd.to_datetime(df_p['Date'])
-        years = sorted(df_p['Date'].dt.year.unique(), reverse=True)
-        sel_year = st.selectbox("Он сонгох:", years)
-        df_year = df_p[df_p['Date'].dt.year == sel_year]
-        
-        tab1, tab2 = st.tabs(["📅 Сарын тайлан", "📑 Өдрийн дэлгэрэнгүй"])
-        with tab1:
-            m_pivot = df_year.pivot_table(index=df_year['Date'].dt.month, columns='Meter Model', values='Quantity', aggfunc='sum', fill_value=0)
-            m_pivot.index = [f"{m} сар" for m in m_pivot.index]
-            m_pivot.loc['НИЙТ ДҮН'] = m_pivot.sum()
-            st.dataframe(m_pivot, use_container_width=True)
-        with tab2:
-            d_pivot = df_year.pivot_table(index='Date', columns='Meter Model', values='Quantity', aggfunc='sum', fill_value=0)
-            d_pivot.loc['НИЙТ ДҮН'] = d_pivot.sum()
-            st.dataframe(d_pivot, use_container_width=True)
+st.header("🗄️ Үйлдвэрлэлийн түүхэн архив")
+df_p = st.session_state.prod_df.copy()
+if not df_p.empty:
+df_p['Date'] = pd.to_datetime(df_p['Date'])
+years = sorted(df_p['Date'].dt.year.unique(), reverse=True)
+sel_year = st.selectbox("Он сонгох:", years)
+df_year = df_p[df_p['Date'].dt.year == sel_year]
+
+tab1, tab2 = st.tabs(["📅 Сарын тайлан", "📑 Өдрийн дэлгэрэнгүй"])
+with tab1:
+    m_pivot = df_year.pivot_table(index=df_year['Date'].dt.month, columns='Meter Model', values='Quantity', aggfunc='sum', fill_value=0)
+    m_pivot.index = [f"{m} сар" for m in m_pivot.index]
+    m_pivot.loc['НИЙТ ДҮН'] = m_pivot.sum()
+    st.dataframe(m_pivot, use_container_width=True)
+with tab2:
+    d_pivot = df_year.pivot_table(index='Date', columns='Meter Model', values='Quantity', aggfunc='sum', fill_value=0)
+    d_pivot.loc['НИЙТ ДҮН'] = d_pivot.sum()
+    st.dataframe(d_pivot, use_container_width=True)
