@@ -15,7 +15,7 @@ def load_models():
     if os.path.exists(MODELS_FILE):
         return pd.read_csv(MODELS_FILE)['Model'].tolist()
     else:
-        initial_models = ["CL710K22 (60A)", "CL710K22 4G (60A)", "CL730S22 4G (100A)", "CL730S22 PLC (100A)"]
+        initial_models = ["CL710K22 (60A)", "CL710K22 4G (60A)", "CL730S22 4G (100A)", "CL730S22 PLC (100A)", "CL730D22L 4G (5A)", "CL730D22L PLC (5A)", "CL730D22H 4G (100B)"]
         pd.DataFrame({"Model": initial_models}).to_csv(MODELS_FILE, index=False)
         return initial_models
 
@@ -44,16 +44,15 @@ if 'prod_df' not in st.session_state: st.session_state.prod_df = load_production
 if 'contract_df' not in st.session_state: st.session_state.contract_df = load_contracts()
 if 'editing_id' not in st.session_state: st.session_state.editing_id = None
 
-# --- SIDEBAR (ХАЖУУГИЙН ЦЭС) ---
+# --- SIDEBAR ---
 with st.sidebar:
     st.markdown("""
         <div style='background-color:#004488; padding:15px; border-radius:10px; text-align:center;'>
             <h1 style='color:white; margin:0; font-size:1.8em;'>⚡ ДСЦТС ХК</h1>
-            <p style='color:#e0e0e0; margin:5px 0 0 0; font-size:0.9em;'>Борлуулалт, төлөвлөлтийн хэлтэс</p>
+            <p style='color:#e0e0e0; margin:5px 0 0 0; font-size:0.9em;'>Борлуулалт, бодлого төлөвлөлтийн хэлтэс</p>
         </div><br>
     """, unsafe_allow_html=True)
     
-    # ЭНД ШИНЭ ГАРЦ НЭМЭВ: АДМИН ГОРИМ (НУУЦ ҮГГҮЙ)
     is_admin = st.toggle("🛠️ Засах эрх идэвхжүүлэх", value=False)
     
     st.divider()
@@ -65,7 +64,6 @@ with st.sidebar:
 if menu == "🏠 Бүртгэл":
     st.header("🏭 Үйлдвэрлэлийн Бүртгэл & Түүх")
     
-    # Зөвхөн Админ горимд бүртгэлийн форм харагдана
     if is_admin:
         edit_data = None
         if st.session_state.editing_id is not None:
@@ -92,7 +90,7 @@ if menu == "🏠 Бүртгэл":
                     save_data(st.session_state.prod_df, DATA_FILE)
                     st.rerun()
     else:
-        st.info("ℹ️ Та 'Харах' горимд байна. Мэдээлэл нэмэх бол хажуугийн цэсний 'Засах эрх'-ийг идэвхжүүлнэ үү.")
+        st.info("ℹ️ Та 'Зөвхөн харах' горимд байна.")
 
     st.divider()
     st.subheader("🔍 Сүүлийн бүртгэлүүд")
@@ -101,7 +99,7 @@ if menu == "🏠 Бүртгэл":
     with st.container(height=450):
         for i, r in df_view.iterrows():
             with st.expander(f"📅 {r['Date']} | {r['Meter Model']} | {int(r['Quantity'])} ш"):
-                if is_admin: # Зөвхөн админ товчлуур харна
+                if is_admin:
                     c1, c2 = st.columns(2)
                     if c1.button("📝 Засах", key=f"edit_{r['ID']}", use_container_width=True):
                         st.session_state.editing_id = r['ID']
@@ -111,62 +109,91 @@ if menu == "🏠 Бүртгэл":
                         save_data(st.session_state.prod_df, DATA_FILE)
                         st.rerun()
                 else:
-                    st.write(f"ID: {r['ID']} | Марк: {r['Meter Model']} | Тоо: {int(r['Quantity'])}")
+                    st.write(f"Бүртгэлийн ID: {r['ID']} | Тоо хэмжээ: {int(r['Quantity'])} ш")
 
 # --- 2. НИЙЛҮҮЛЭЛТ ---
 elif menu == "📦 Нийлүүлэлт":
     st.header("📦 Нийлүүлэлтийн удирдлага")
+    df_c = st.session_state.contract_df.copy()
+    
     if is_admin:
-        df_c = st.session_state.contract_df.copy()
         with st.expander("➕ Шинэ нийлүүлэлтийн багана нэмэх"):
             new_col_date = st.date_input("Огноо сонгох", datetime.date.today())
             if st.button("Багана нэмэх"):
                 date_str = new_col_date.strftime("%Y-%m-%d")
-                df_c[date_str] = 0
-                st.session_state.contract_df = df_c
-                save_data(df_c, CONTRACT_FILE)
-                st.rerun()
+                if date_str not in df_c.columns:
+                    df_c[date_str] = 0
+                    st.session_state.contract_df = df_c
+                    save_data(df_c, CONTRACT_FILE)
+                    st.rerun()
         
         edited_df = st.data_editor(df_c, hide_index=True, use_container_width=True)
         if st.button("💾 Хадгалах"):
             st.session_state.contract_df = edited_df
             save_data(edited_df, CONTRACT_FILE)
-            st.success("Хадгалагдлаа!")
+            st.success("Нийлүүлэлтийн мэдээлэл хадгалагдлаа!")
     else:
-        st.dataframe(st.session_state.contract_df, hide_index=True, use_container_width=True)
+        st.dataframe(df_c, hide_index=True, use_container_width=True)
 
-# --- 3. ГРАФИК --- (ЗӨВХӨН ХАРНА)
+# --- 3. ГРАФИК ---
 elif menu == "📈 График":
     st.header("📈 Үйлдвэрлэлийн шинжилгээ")
     df_p = st.session_state.prod_df.copy()
     if not df_p.empty:
         df_p['Date'] = pd.to_datetime(df_p['Date'])
+        st.subheader("📊 Сарын нийт үйлдвэрлэл")
         m_data = df_p.groupby([df_p['Date'].dt.strftime('%Y-%m'), 'Meter Model'])['Quantity'].sum().unstack().fillna(0)
         st.bar_chart(m_data)
+        
+        st.divider()
+        st.subheader("📈 Нийт хуримтлагдсан өсөлт")
+        c_data = df_p.sort_values('Date').groupby('Date')['Quantity'].sum().cumsum()
+        st.area_chart(c_data)
     else:
-        st.info("Өгөгдөл алга.")
+        st.info("График харуулах өгөгдөл алга.")
 
-# --- 4. ТАЙЛАН --- (ЗӨВХӨН ХАРНА)
+# --- 4. ТАЙЛАН ---
 elif menu == "📋 Тайлан":
     st.header("📋 Жилийн нэгтгэл тайлан")
     df_p = st.session_state.prod_df.copy()
     df_c = st.session_state.contract_df.copy()
+
     if not df_p.empty:
+        df_p['Date'] = pd.to_datetime(df_p['Date'])
+        
+        st.subheader("📅 Сарын үйлдвэрлэлийн нэгтгэл")
+        month_pivot = df_p.pivot_table(index=[df_p['Date'].dt.year, df_p['Date'].dt.month], columns='Meter Model', values='Quantity', aggfunc='sum', fill_value=0)
+        month_pivot.index = [f"{int(y)}-{int(m)} сар" for y, m in month_pivot.index]
+        month_pivot['НИЙТ'] = month_pivot.sum(axis=1)
+        st.dataframe(month_pivot, use_container_width=True)
+
+        st.divider()
+        st.subheader("📦 Нийлүүлэлтийн үлдэгдэл")
+        supply_cols = [c for c in df_c.columns if c != "Марк"]
+        df_c['Нийт Нийлүүлэлт'] = df_c[supply_cols].sum(axis=1)
         prod_sum = df_p.groupby("Meter Model")["Quantity"].sum().reset_index()
-        st.dataframe(prod_sum, use_container_width=True)
+        prod_sum.columns = ["Марк", "Үйлдвэрлэсэн"]
+        final = pd.merge(df_c[['Марк', 'Нийт Нийлүүлэлт']], prod_sum, on="Марк", how="left").fillna(0)
+        final["Үлдэгдэл"] = final["Нийт Нийлүүлэлт"] - final["Үйлдвэрлэсэн"]
+        st.dataframe(final, use_container_width=True, hide_index=True)
     else:
-        st.warning("Мэдээлэл олдсонгүй.")
+        st.warning("Тайлан гаргах өгөгдөл олдсонгүй.")
 
 # --- 5. АРХИВ ---
 elif menu == "🗄️ Архив":
     st.header("🗄️ Үйлдвэрлэлийн түүхэн архив")
-    st.dataframe(st.session_state.prod_df.sort_values(by="Date", ascending=False), use_container_width=True)
+    df_p = st.session_state.prod_df.copy()
+    if not df_p.empty:
+        st.dataframe(df_p.sort_values(by="Date", ascending=False), use_container_width=True, hide_index=True)
+    else:
+        st.info("Архив хоосон байна.")
 
 # --- 6. ТОХИРГОО ---
 elif menu == "⚙️ Тохиргоо":
+    st.header("⚙️ Системийн тохиргоо")
     if is_admin:
-        st.header("⚙️ Системийн тохиргоо")
-        with st.form("add_model"):
+        st.subheader("📋 Тоолуурын марк удирдах")
+        with st.form("add_model", clear_on_submit=True):
             new_model = st.text_input("Шинэ марк нэмэх:")
             if st.form_submit_button("➕ Нэмэх"):
                 if new_model and new_model not in st.session_state.models:
@@ -174,13 +201,17 @@ elif menu == "⚙️ Тохиргоо":
                     save_models(st.session_state.models)
                     st.rerun()
         
+        st.divider()
         st.write("Одоо байгаа маркууд:")
         for m in st.session_state.models:
             c1, c2 = st.columns([4, 1])
             c1.write(m)
-            if c2.button("🗑️", key=f"del_mod_{m}"):
+            if c2.button("🗑️ Устгах", key=f"del_mod_{m}"):
                 st.session_state.models.remove(m)
                 save_models(st.session_state.models)
                 st.rerun()
     else:
-        st.warning("⚠️ Тохиргоо цэсийг зөвхөн Засах эрхтэй үед харах боломжтой.")
+        st.warning("⚠️ Тохиргоог өөрчлөх бол 'Засах эрх'-ийг идэвхжүүлнэ үү.")
+        st.write("Одоо ашиглагдаж буй маркууд:")
+        for m in st.session_state.models:
+            st.text(f"• {m}")
