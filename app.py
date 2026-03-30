@@ -7,18 +7,17 @@ import requests
 # --- ТӨХӨӨРӨМЖИЙН ТОХИРГОО ---
 st.set_page_config(page_title="DSEDN Smart Meter ERP", layout="wide", page_icon="⚡")
 
-# --- TELEGRAM ТОХИРГОО (ШИНЭЧЛЭГДСЭН) ---
+# --- TELEGRAM ТОХИРГОО ---
 TOKEN = "8765368873:AAHMyHbJFjM2DmsxT3ZCF3jbKh4-PGHV9e4"
 CHAT_ID = "610852925"
 
 def send_telegram_notification(message):
-    """Telegram руу мэдэгдэл илгээх функц"""
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     payload = {"chat_id": CHAT_ID, "text": message, "parse_mode": "Markdown"}
     try:
-        requests.post(url, data=payload, timeout=10)
-    except Exception as e:
-        st.error(f"Мэдэгдэл илгээхэд алдаа гарлаа: {e}")
+        requests.post(url, data=payload, timeout=5)
+    except:
+        pass
 
 DATA_FILE = "production_data.csv"
 CONTRACT_FILE = "contract_supply_data.csv"
@@ -69,57 +68,86 @@ with st.sidebar:
     st.divider()
     st.caption("Зохиогч С.БАТБААТАР | 2026")
 
-# --- 4. БҮРТГЭЛ (МЭДЭГДЭЛТЭЙ ХУВИЛБАР) ---
-if menu == "🏠 Бүртгэл":
+# --- 1. ТАЙЛАН ---
+if menu == "📋 Тайлан":
+    st.header("📋 Үйлдвэрлэлийн нэгтгэл тайлан")
+    df_p = st.session_state.prod_df.copy()
+    df_c = st.session_state.contract_df.copy()
+    if not df_p.empty:
+        df_p['Date'] = pd.to_datetime(df_p['Date'])
+        st.subheader("📅 Сарын үйлдвэрлэлийн задаргаа")
+        available_years = sorted(df_p['Date'].dt.year.unique(), reverse=True)
+        report_year = st.selectbox("Он сонгох:", available_years)
+        df_yr = df_p[df_p['Date'].dt.year == report_year]
+        if not df_yr.empty:
+            m_pivot = df_yr.pivot_table(index=df_yr['Date'].dt.month, columns='Meter Model', values='Quantity', aggfunc='sum', fill_value=0)
+            m_pivot.index = [f"{m} сар" for m in m_pivot.index]
+            m_pivot['НИЙТ'] = m_pivot.sum(axis=1)
+            st.dataframe(m_pivot, use_container_width=True)
+
+# --- 2. ГРАФИК ---
+elif menu == "📈 График":
+    st.header("📈 Үйлдвэрлэлийн шинжилгээ")
+    df_p = st.session_state.prod_df.copy()
+    if not df_p.empty:
+        df_p['Date'] = pd.to_datetime(df_p['Date'])
+        df_p['Month'] = df_p['Date'].dt.strftime('%Y-%m')
+        st.bar_chart(df_p.groupby(['Month', 'Meter Model'])['Quantity'].sum().unstack().fillna(0))
+
+# --- 3. АРХИВ ---
+elif menu == "🗄️ Архив":
+    st.header("🗄️ Түүхэн архив")
+    df_p = st.session_state.prod_df.copy()
+    if not df_p.empty:
+        st.dataframe(df_p.sort_values('Date', ascending=False), use_container_width=True, hide_index=True)
+
+# --- 4. БҮРТГЭЛ ---
+elif menu == "🏠 Бүртгэл":
     st.header("🏭 Үйлдвэрлэлийн Бүртгэл")
     if is_admin:
         edit_id = st.session_state.editing_id
-        default_date, default_model, default_qty = datetime.date.today(), load_models()[0], 1
-        
-        if edit_id:
-            row = st.session_state.prod_df[st.session_state.prod_df['ID'] == edit_id].iloc[0]
-            default_date, default_model, default_qty = row['Date'], row['Meter Model'], int(row['Quantity'])
-            st.warning(f"Одоо ID: {edit_id} засаж байна.")
-
         with st.form("prod_form", clear_on_submit=True):
             c1, c2, c3 = st.columns([1, 2, 1])
-            d_val = c1.date_input("Огноо", default_date)
-            m_val = c2.selectbox("Марк", load_models(), index=load_models().index(default_model) if default_model in load_models() else 0)
-            q_val = c3.number_input("Тоо", min_value=1, value=default_qty)
-            
-            if st.form_submit_button("💾 Хадгалах" if edit_id else "➕ Бүртгэх"):
-                if edit_id:
-                    st.session_state.prod_df.loc[st.session_state.prod_df['ID'] == edit_id, ['Date', 'Meter Model', 'Quantity']] = [d_val, m_val, q_val]
-                    msg = f"📝 *ЗАСВАР ОРЛОО*\n\n🆔 ID: {edit_id}\n📦 Марк: {m_val}\n🔢 Тоо: {q_val} ш\n📅 Огноо: {d_val}"
-                    st.session_state.editing_id = None
-                else:
-                    new_id = int(st.session_state.prod_df['ID'].max() + 1) if not st.session_state.prod_df.empty else 1
-                    new_row = pd.DataFrame({"ID":[new_id], "Date":[d_val], "Meter Model":[m_val], "Quantity":[q_val]})
-                    st.session_state.prod_df = pd.concat([st.session_state.prod_df, new_row], ignore_index=True)
-                    msg = f"🏗️ *ШИНЭ ҮЙЛДВЭРЛЭЛ*\n\n📦 Марк: {m_val}\n🔢 Тоо: {q_val} ш\n📅 Огноо: {d_val}\n👤 Бүртгэсэн: Батбаатар"
-                
+            d_val = c1.date_input("Огноо", datetime.date.today())
+            m_val = c2.selectbox("Марк", load_models())
+            q_val = c3.number_input("Тоо", min_value=1, value=1)
+            if st.form_submit_button("➕ Бүртгэх"):
+                new_id = int(st.session_state.prod_df['ID'].max() + 1) if not st.session_state.prod_df.empty else 1
+                new_row = pd.DataFrame({"ID":[new_id], "Date":[d_val], "Meter Model":[m_val], "Quantity":[q_val]})
+                st.session_state.prod_df = pd.concat([st.session_state.prod_df, new_row], ignore_index=True)
                 save_data(st.session_state.prod_df, DATA_FILE)
-                send_telegram_notification(msg) # Telegram руу илгээх
-                st.success("Амжилттай хадгалагдлаа! (Мэдэгдэл илгээгдсэн)")
+                # Telegram Мэдэгдэл
+                msg = f"🏗️ *ШИНЭ ҮЙЛДВЭРЛЭЛ*\n\n📦 Марк: {m_val}\n🔢 Тоо: {q_val} ш\n📅 Огноо: {d_val}\n👤 Бүртгэсэн: Батбаатар"
+                send_telegram_notification(msg)
+                st.success("Амжилттай бүртгэгдлээ!")
                 st.rerun()
-        
-        if edit_id and st.button("❌ Цуцлах"):
-            st.session_state.editing_id = None
-            st.rerun()
 
     st.divider()
     for _, r in st.session_state.prod_df.sort_values(by="Date", ascending=False).iterrows():
         with st.expander(f"📅 {r['Date']} | {r['Meter Model']} | {int(r['Quantity'])} ш"):
             if is_admin:
-                col1, col2 = st.columns(2)
-                if col1.button("📝 Засах", key=f"edit_{r['ID']}"):
-                    st.session_state.editing_id = r['ID']
-                    st.rerun()
-                if col2.button("🗑️ Устгах", key=f"del_{r['ID']}"):
-                    msg = f"🗑️ *БҮРТГЭЛ УСТГАГДЛАА*\n\n🆔 ID: {r['ID']}\n📦 Марк: {r['Meter Model']}\n🔢 Тоо: {r['Quantity']} ш"
+                if st.button("🗑️ Устгах", key=f"del_{r['ID']}"):
                     st.session_state.prod_df = st.session_state.prod_df[st.session_state.prod_df['ID'] != r['ID']]
                     save_data(st.session_state.prod_df, DATA_FILE)
-                    send_telegram_notification(msg) # Устгасан мэдэгдэл
                     st.rerun()
 
-# (Бусад цэсүүд: Тайлан, График, Архив, Нийлүүлэлт, Тохиргоо хэсгүүд чиний кодтой яг ижилхэн үргэлжилнэ)
+# --- 5. НИЙЛҮҮЛЭЛТ ---
+elif menu == "📦 Нийлүүлэлт":
+    st.header("📦 Нийлүүлэлтийн удирдлага")
+    edited = st.data_editor(st.session_state.contract_df, hide_index=True, use_container_width=True)
+    if st.button("💾 Хадгалах"):
+        st.session_state.contract_df = edited
+        save_data(edited, CONTRACT_FILE)
+        st.success("Хадгалагдлаа!")
+
+# --- 6. ТОХИРГОО ---
+elif menu == "⚙️ Тохиргоо":
+    st.header("⚙️ Системийн тохиргоо")
+    if is_admin:
+        new_m = st.text_input("Шинэ марк нэмэх:")
+        if st.button("➕ Нэмэх"):
+            curr_m = load_models()
+            if new_m not in curr_m:
+                curr_m.append(new_m)
+                pd.DataFrame({"Model": curr_m}).to_csv(MODELS_FILE, index=False)
+                st.rerun()
