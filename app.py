@@ -49,11 +49,7 @@ with st.sidebar:
     st.divider()
     st.caption("Зохиогч С.БАТБААТАР")
 
-# --- 1. БҮРТГЭЛ ---
-if menu == "🏠 Бүртгэл":
-    st.header("🏭 Үйлдвэрлэлийн Бүртгэл & Түүх засах")
-    
-    # Бүртгэл хийх хэсэг
+# Бүртгэл хийх хэсэг
     edit_data = None
     if st.session_state.editing_id is not None:
         edit_data = st.session_state.prod_df[st.session_state.prod_df['ID'] == st.session_state.editing_id].iloc[0]
@@ -63,9 +59,17 @@ if menu == "🏠 Бүртгэл":
         with st.form("prod_form", clear_on_submit=True):
             c1, c2, c3 = st.columns([1, 2, 1])
             d_val = c1.date_input("Огноо", edit_data['Date'] if edit_data is not None else datetime.date.today())
-            m_val = c2.selectbox("Марк", METER_MODELS, index=METER_MODELS.index(edit_data['Meter Model']) if edit_data is not None else 0)
+            
+            # Энд METER_MODELS-ийн оронд st.session_state.models-ийг ашиглана
+            current_models = st.session_state.models
+            m_idx = 0
+            if edit_data is not None and edit_data['Meter Model'] in current_models:
+                m_idx = current_models.index(edit_data['Meter Model'])
+            
+            m_val = c2.selectbox("Марк", current_models, index=m_idx)
             q_val = c3.number_input("Тоо", min_value=1, value=int(edit_data['Quantity']) if edit_data is not None else 1)
             btn_txt = "💾 Хадгалах" if edit_data is not None else "➕ Бүртгэх"
+            
             if st.form_submit_button(btn_txt, use_container_width=True, type="primary"):
                 if edit_data is not None:
                     idx = st.session_state.prod_df[st.session_state.prod_df['ID'] == st.session_state.editing_id].index[0]
@@ -77,9 +81,6 @@ if menu == "🏠 Бүртгэл":
                     st.session_state.prod_df = pd.concat([st.session_state.prod_df, new_row], ignore_index=True)
                 save_data(st.session_state.prod_df, DATA_FILE)
                 st.rerun()
-
-    st.divider()
-    st.subheader("🔍 Сүүлийн бүртгэлүүд")
 
     # --- ГҮЙЛГЭДЭГ ХЭСЭГ (SCROLLABLE AREA) ---
     # CSS ашиглан 400px өндөртэй, гүйлгэдэг хайрцаг үүсгэх
