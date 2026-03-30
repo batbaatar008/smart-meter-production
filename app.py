@@ -187,4 +187,49 @@ elif menu == "🏠 Бүртгэл":
         with st.expander(f"📅 {r['Date']} | {r['Meter Model']} | {int(r['Quantity'])} ш"):
             if is_admin:
                 c1, c2 = st.columns(2)
-                if c1.button
+                if c1.button("📝 Засах", key=f"edit_{r['ID']}", use_container_width=True):
+                    st.session_state.editing_id = r['ID']
+                    st.rerun()
+                if c2.button("🗑️ Устгах", key=f"del_{r['ID']}", type="secondary", use_container_width=True):
+                    st.session_state.prod_df = st.session_state.prod_df[st.session_state.prod_df['ID'] != r['ID']]
+                    save_data(st.session_state.prod_df, DATA_FILE)
+                    st.rerun()
+            else:
+                st.write(f"ID: {r['ID']} | Огноо: {r['Date']} | Тоо: {int(r['Quantity'])} ш")
+
+# --- 5. НИЙЛҮҮЛЭЛТ ---
+elif menu == "📦 Нийлүүлэлт":
+    st.header("📦 Нийлүүлэлтийн удирдлага")
+    df_c = st.session_state.contract_df.copy()
+    if is_admin:
+        edited_df = st.data_editor(df_c, hide_index=True, use_container_width=True)
+        if st.button("💾 Хадгалах"):
+            st.session_state.contract_df = edited_df
+            save_data(edited_df, CONTRACT_FILE)
+            st.success("Хадгалагдлаа!")
+    else:
+        st.dataframe(df_c, hide_index=True, use_container_width=True)
+
+# --- 6. ТОХИРГОО ---
+elif menu == "⚙️ Тохиргоо":
+    st.header("⚙️ Системийн тохиргоо")
+    if is_admin:
+        with st.form("add_model", clear_on_submit=True):
+            new_model = st.text_input("Шинэ марк нэмэх:")
+            if st.form_submit_button("➕ Нэмэх"):
+                if new_model and new_model not in st.session_state.models:
+                    st.session_state.models.append(new_model)
+                    save_models(st.session_state.models)
+                    st.rerun()
+        
+        st.divider()
+        st.write("Одоо байгаа маркууд:")
+        for m in st.session_state.models:
+            c1, c2 = st.columns([4, 1])
+            c1.write(m)
+            if c2.button("🗑️", key=f"del_mod_{m}"):
+                st.session_state.models.remove(m)
+                save_models(st.session_state.models)
+                st.rerun()
+    else:
+        st.warning("⚠️ Тохиргоог өөрчлөх бол 'Засах эрх'-ийг идэвхжүүлнэ үү.")
