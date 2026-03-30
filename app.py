@@ -47,7 +47,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     menu = st.radio("Үндсэн цэс:", ["🏠 Бүртгэл", "📦 Нийлүүлэлт", "📈 График", "📋 Тайлан", "🗄️ Архив"])
     st.divider()
-    st.caption("Зохиогч OO8")
+    st.caption("Зохиогч С.БАТБААТАР")
 
 # --- 1. БҮРТГЭЛ ---
 if menu == "🏠 Бүртгэл":
