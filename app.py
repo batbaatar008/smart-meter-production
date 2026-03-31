@@ -58,7 +58,7 @@ with st.sidebar:
     st.divider()
     st.caption("Зохиогч С.БАТБААТАР | 2026")
 
-# --- 0. ДАШБОАРД ХЭСЭГ (ШИНЭ) ---
+# --- 0. ДАШБОАРД ХЭСЭГ (ШИНЭЧЛЭГДСЭН) ---
 if menu == "📊 Дашбоард":
     st.markdown(f"<h2 style='text-align: center; color: #1f3b64;'>⚡ ҮЙЛДВЭРЛЭЛИЙН НЭГДСЭН ДАШБОАРД</h2>", unsafe_allow_html=True)
     df_p = st.session_state.prod_df.copy()
@@ -68,6 +68,7 @@ if menu == "📊 Дашбоард":
         df_p['Date'] = pd.to_datetime(df_p['Date'])
         supply_cols = [c for c in df_c.columns if c != "Марк"]
         
+        # Хамгийн сүүлийн үйлдвэрлэсэн огноо болон тоог олох
         last_date = df_p['Date'].max()
         last_prod_qty = df_p[df_p['Date'] == last_date]['Quantity'].sum()
         last_date_str = last_date.strftime('%Y-%m-%d')
@@ -78,7 +79,7 @@ if menu == "📊 Дашбоард":
         total_produced_all = df_p['Quantity'].sum()
         remaining_stock = total_supply_val - total_produced_all
 
-        # Гурван Gauge график
+        # 1. ДЭЭД ТАЛД: Гурван Gauge график
         m1, m2, m3 = st.columns(3)
         with m1:
             fig1 = go.Figure(go.Indicator(
@@ -103,16 +104,23 @@ if menu == "📊 Дашбоард":
             st.plotly_chart(fig3, use_container_width=True)
 
         st.divider()
+
+        # 2. ДООД ТАЛД: Bar болон Pie график
         g1, g2 = st.columns([2, 1])
         with g1:
-            fig_bar = px.bar(df_p, x=df_p['Date'].dt.month, y='Quantity', color='Meter Model', title="Сар бүрийн үйлдвэрлэл", barmode='stack')
+            # Сар бүрийн үйлдвэрлэлийг маркаар харуулах
+            df_p['Month_Name'] = df_p['Date'].dt.month
+            fig_bar = px.bar(df_p, x='Month_Name', y='Quantity', color='Meter Model', 
+                             title="Сар бүрийн үйлдвэрлэл", barmode='stack',
+                             labels={'Month_Name': 'Сар', 'Quantity': 'Тоо ширхэг'})
             st.plotly_chart(fig_bar, use_container_width=True)
         with g2:
-            fig_pie = px.pie(df_p, values='Quantity', names='Meter Model', title="Нийт бүтцийн хувь", hole=0.4)
+            # Нийт үйлдвэрлэлийн бүтцийг маркаар харуулах
+            fig_pie = px.pie(df_p, values='Quantity', names='Meter Model', 
+                             title="Нийт бүтцийн хувь", hole=0.4)
             st.plotly_chart(fig_pie, use_container_width=True)
     else:
         st.info("Өгөгдөл байхгүй байна. 'Бүртгэл' цэсээр орж өгөгдөл оруулна уу.")
-
 # --- 1. ТАЙЛАН ---
 elif menu == "📋 Тайлан":
     st.header("📋 Үйлдвэрлэлийн нэгтгэл тайлан")
