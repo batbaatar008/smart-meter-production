@@ -53,7 +53,7 @@ with st.sidebar:
     
     is_admin = st.toggle("🛠️ Засах эрх идэвхжүүлэх", value=False)
     st.divider()
-    menu = st.radio("Үндсэн цэс:", ["📊 Дашбоард", "📋 Тайлан", "📈 График", "🗄️ Архив", "🏠 Бүртгэл", "📦 Нийлүүлэлт", "⚙️ Тохиргоо"])
+    menu = st.radio("Үндсэн цэс:", ["📊 Дашбоард", "📋 Тайлан", "📈 График", "🗄️ Архив", "🏠 Бүртгэл", "📦 Нийлүүлэлт", "⚙️ Toхиргоо"])
     st.divider()
     st.caption("Зохиогч С.БАТБААТАР | 2026")
 
@@ -229,7 +229,7 @@ elif menu == "📦 Нийлүүлэлт":
         st.dataframe(st.session_state.contract_df, hide_index=True, use_container_width=True)
 
 # --- 6. ТОХИРГОО ---
-elif menu == "⚙️ Тохиргоо":
+elif menu == "⚙️ Toхиргоо":
     st.header("⚙️ Системийн тохиргоо")
     if is_admin:
         curr_m = load_models()
