@@ -68,7 +68,6 @@ if menu == "📊 Дашбоард":
         df_p['Date'] = pd.to_datetime(df_p['Date'])
         supply_cols = [c for c in df_c.columns if c != "Марк"]
         
-        # Хамгийн сүүлийн үйлдвэрлэсэн огноо болон тоог олох
         last_date = df_p['Date'].max()
         last_prod_qty = df_p[df_p['Date'] == last_date]['Quantity'].sum()
         last_date_str = last_date.strftime('%Y-%m-%d')
@@ -85,21 +84,21 @@ if menu == "📊 Дашбоард":
             fig1 = go.Figure(go.Indicator(
                 mode = "gauge+number", value = last_prod_qty, 
                 title = {'text': f"СҮҮЛИЙН ҮЙЛДВЭРЛЭЛ<br><span style='font-size:0.8em;color:gray'>{last_date_str}</span>"},
-                gauge = {'axis': {'range': [None, 150]}, 'bar': {'color': "#FF4B4B"}}))
+                gauge = {'axis': {'range': [None, 200]}, 'bar': {'color': "#FF4B4B"}}))
             fig1.update_layout(height=280, margin=dict(l=20, r=20, t=50, b=20))
             st.plotly_chart(fig1, use_container_width=True)
             
         with m2:
             fig2 = go.Figure(go.Indicator(
                 mode = "gauge+number", value = month_prod, title = {'text': "ЭНЭ САР (Ш)"},
-                gauge = {'axis': {'range': [None, 2000]}, 'bar': {'color': "#1f3b64"}}))
+                gauge = {'axis': {'range': [None, 3000]}, 'bar': {'color': "#1f3b64"}}))
             fig2.update_layout(height=280, margin=dict(l=20, r=20, t=50, b=20))
             st.plotly_chart(fig2, use_container_width=True)
             
         with m3:
             fig3 = go.Figure(go.Indicator(
                 mode = "gauge+number", value = remaining_stock, title = {'text': "ҮЛДЭГДЭЛ (Ш)"},
-                gauge = {'axis': {'range': [None, 5000]}, 'bar': {'color': "#28a745"}}))
+                gauge = {'axis': {'range': [None, 10000]}, 'bar': {'color': "#28a745"}}))
             fig3.update_layout(height=280, margin=dict(l=20, r=20, t=50, b=20))
             st.plotly_chart(fig3, use_container_width=True)
 
