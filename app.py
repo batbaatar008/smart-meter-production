@@ -4,72 +4,66 @@
     <meta charset="UTF-8">
     <title>Smart-Grid Lab: CLOU Simulator</title>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #e0e0e0; color: #333; margin: 0; }
-        .ui-panel { background: #333; color: white; padding: 15px; border-bottom: 3px solid #ffcc00; }
-        .container { position: relative; width: 600px; height: 800px; margin: 20px auto; background: white; border-radius: 8px; border: 3px solid #666; overflow: hidden; }
-        canvas { position: absolute; top: 0; left: 0; z-index: 5; cursor: crosshair; }
+        body { font-family: sans-serif; text-align: center; background: #f4f4f4; margin: 0; }
+        .ui-panel { background: #2c3e50; color: white; padding: 20px; border-bottom: 4px solid #f1c40f; }
+        .container { position: relative; width: 600px; height: 800px; margin: 20px auto; background: white; border: 2px solid #bdc3c7; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
+        canvas { position: absolute; top: 0; left: 0; z-index: 10; cursor: crosshair; }
         /* Гараар зурсан схем */
-        .scheme-bg { position: absolute; width: 100%; height: 100%; top: 0; left: 0; z-index: 1; pointer-events: none; opacity: 0.9; }
-        /* CLOU тоолуур (Схем дээр тааруулж байрлуулсан) */
-        .meter-overlay { position: absolute; width: 330px; top: 180px; left: 135px; z-index: 2; pointer-events: none; }
-        .controls { padding: 15px; }
-        .btn { padding: 10px 25px; font-size: 18px; cursor: pointer; border: none; border-radius: 5px; margin: 5px; font-weight: bold; }
-        .btn-check { background: #2ed573; color: white; }
-        .btn-reset { background: #ff4757; color: white; }
+        .scheme-bg { position: absolute; width: 100%; height: 100%; top: 0; left: 0; z-index: 1; opacity: 0.8; object-fit: contain; }
+        /* CLOU тоолуур */
+        .meter-overlay { position: absolute; width: 320px; top: 190px; left: 140px; z-index: 2; pointer-events: none; }
+        .controls { margin-bottom: 30px; }
+        .btn { padding: 12px 30px; font-size: 18px; cursor: pointer; border: none; border-radius: 5px; margin: 10px; font-weight: bold; transition: 0.3s; }
+        .btn-check { background: #27ae60; color: white; }
+        .btn-reset { background: #e74c3c; color: white; }
+        .btn:hover { opacity: 0.8; transform: translateY(-2px); }
     </style>
 </head>
 <body>
     <div class="ui-panel">
-        <h2>⚡ Smart-Grid Lab: CL710K22 Ухаалаг тоолуур</h2>
-        <p>Заавар: Зурсан схемийн дагуу А фаз (Шар) болон Тэг N (Цэнхэр) цэгээс чирч тоолуурын контакт руу холбоно уу.</p>
+        <h2>⚡ Smart-Grid Lab: Бодит Холболтын Симулятор</h2>
+        <p>Заавар: Дээд талын салгуурын цэгүүдээс чирч, тоолуурын 1 болон 3-р шонд холбоно уу.</p>
     </div>
 
     <div class="container">
-        <img src="hand_drawn_scheme.jpg" class="scheme-bg" alt="Scheme background">
-        <img src="image_0473e1.jpg" class="meter-overlay" alt="CLOU Meter">
+        <img src="https://raw.githubusercontent.com/batbaatar008/smart-meter-simulator/main/image_054a18.jpg" class="scheme-bg">
+        <img src="https://raw.githubusercontent.com/batbaatar008/smart-meter-simulator/main/image_0473e1.jpg" class="meter-overlay">
         <canvas id="simCanvas" width="600" height="800"></canvas>
     </div>
 
     <div class="controls">
-        <button class="btn btn-check" onclick="checkConnection()">Холболтыг шалгах</button>
-        <button class="btn btn-reset" onclick="resetSim()">Шинэчлэх</button>
+        <button class="btn btn-check" onclick="check()">Холболтыг шалгах</button>
+        <button class="btn btn-reset" onclick="reset()">Шинэчлэх</button>
     </div>
 
     <script>
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
 
-        // Контакт цэгүүд (Схем болон Тоолуурын зураг дээр тааруулсан)
+        // Цэгүүдийн байршил (Зураг дээрх салгуур болон тоолуурын шонд тааруулсан)
         const pins = [
-            // Эхлэх цэгүүд (Салгуур)
-            { id: 'S-L', x: 235, y: 55, color: 'yellow', type: 'start', label: 'L' },
-            { id: 'S-N', x: 235, y: 110, color: '#00ccff', type: 'start', label: 'N' },
-            // Төгсгөл цэгүүд (CLOU тоолуур - Контактын дагуу)
-            { id: 'M-1', x: 255, y: 585, color: 'yellow', type: 'end', connected: null }, // Шон 1 (L-In)
-            { id: 'M-3', x: 335, y: 585, color: '#00ccff', type: 'end', connected: null }  // Шон 3 (N-In)
+            { id: 'S-L', x: 235, y: 55, color: 'yellow', type: 'start' }, // Салгуур Фаз
+            { id: 'S-N', x: 235, y: 115, color: '#00ccff', type: 'start' }, // Салгуур Тэг
+            { id: 'M-1', x: 260, y: 595, color: 'yellow', type: 'end', connected: null }, // Тоолуур 1-р шон
+            { id: 'M-3', x: 340, y: 595, color: '#00ccff', type: 'end', connected: null }  // Тоолуур 3-р шон
         ];
 
         let wires = [];
-        let drawingWire = null;
+        let drawing = null;
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Цэгүүдийг зурах
             pins.forEach(p => {
                 ctx.beginPath();
-                ctx.arc(p.x, p.y, 10, 0, Math.PI*2);
-                ctx.fillStyle = p.type === 'start' ? p.color : '#333';
+                ctx.arc(p.x, p.y, 12, 0, Math.PI*2);
+                ctx.fillStyle = p.type === 'start' ? p.color : 'rgba(0,0,0,0.1)';
                 ctx.fill();
-                ctx.strokeStyle = 'black';
+                ctx.strokeStyle = '#2c3e50';
                 ctx.lineWidth = 2;
                 ctx.stroke();
-                ctx.fillStyle = 'black';
-                ctx.font = "bold 16px Arial";
-                if(p.label) ctx.fillText(p.label, p.x - 20, p.y - 15);
             });
 
-            // Холбогдсон утаснууд
             wires.forEach(w => {
                 ctx.beginPath();
                 ctx.moveTo(w.from.x, w.from.y);
@@ -80,14 +74,13 @@
                 ctx.stroke();
             });
 
-            // Одоо чирч байгаа утас
-            if(drawingWire) {
+            if(drawing) {
                 ctx.beginPath();
-                ctx.moveTo(drawingWire.from.x, drawingWire.from.y);
-                ctx.lineTo(drawingWire.currX, drawingWire.currY);
-                ctx.strokeStyle = drawingWire.color;
+                ctx.moveTo(drawing.from.x, drawing.from.y);
+                ctx.lineTo(drawing.x, drawing.y);
+                ctx.strokeStyle = drawing.color;
                 ctx.lineWidth = 4;
-                ctx.setLineDash([8, 4]);
+                ctx.setLineDash([10, 5]);
                 ctx.stroke();
                 ctx.setLineDash([]);
             }
@@ -99,48 +92,47 @@
             const x = e.clientX - r.left;
             const y = e.clientY - r.top;
             pins.forEach(p => {
-                if(Math.hypot(p.x-x, p.y-y) < 15 && p.type === 'start') {
-                    drawingWire = { from: p, currX: x, currY: y, color: p.color };
+                if(Math.hypot(p.x-x, p.y-y) < 20 && p.type === 'start') {
+                    drawing = { from: p, x: x, y: y, color: p.color };
                 }
             });
         };
 
         canvas.onmousemove = (e) => {
-            if(drawingWire) {
+            if(drawing) {
                 const r = canvas.getBoundingClientRect();
-                drawingWire.currX = e.clientX - r.left;
-                drawingWire.currY = e.clientY - r.top;
+                drawing.x = e.clientX - r.left;
+                drawing.y = e.clientY - r.top;
             }
         };
 
         canvas.onmouseup = (e) => {
-            if(drawingWire) {
+            if(drawing) {
                 pins.forEach(p => {
-                    if(Math.hypot(p.x-drawingWire.currX, p.y-drawingWire.currY) < 15 && p.type === 'end') {
-                        // Зөвхөн ижил өнгөтэй утсыг холбох логик
-                        if(drawingWire.color === p.color) {
-                            wires.push({ from: drawingWire.from, to: p, color: drawingWire.color });
-                            p.connected = drawingWire.color;
+                    if(Math.hypot(p.x-drawing.x, p.y-drawing.y) < 20 && p.type === 'end') {
+                        if(drawing.color === p.color) {
+                            wires.push({ from: drawing.from, to: p, color: drawing.color });
+                            p.connected = drawing.color;
                         } else {
-                            alert("❌ Утасны өнгө болон шонгийн төрөл зөрж байна! Фаз (Шар) болон Тэг (Цэнхэр) утасны шонг дахин шалгана уу.");
+                            alert("❌ Буруу шон! Фаз (Шар) болон Тэг (Цэнхэр) утсыг өнгөөр нь ялгаж холбоно уу.");
                         }
                     }
                 });
-                drawingWire = null;
+                drawing = null;
             }
         };
 
-        function checkConnection() {
-            const m1 = pins.find(p => p.id === 'M-1').connected;
-            const m3 = pins.find(p => p.id === 'M-3').connected;
-            if(m1 === 'yellow' && m3 === '#00ccff') {
-                alert("🎉 ГАЙХАЛТАЙ! CLOU тоолуур зөв холбогдлоо. Насос ажиллаж байна!");
+        function check() {
+            const l = pins.find(p => p.id === 'M-1').connected;
+            const n = pins.find(p => p.id === 'M-3').connected;
+            if(l && n) {
+                alert("🎉 БАЯР ХҮРГЭЕ! Чи схемийн дагуу CLOU тоолуурыг амжилттай холболоо.");
             } else {
-                alert("❌ Холболт буруу! Схемийн дагуу Фаз болон Тэгээ дахин шалгана уу.");
+                alert("❌ Холболт дутуу байна. Салгуураас тоолуурын шон руу утсаа чирч холбоно уу.");
             }
         }
 
-        function resetSim() { wires = []; pins.forEach(p => p.connected = null); }
+        function reset() { wires = []; pins.forEach(p => p.connected = null); }
         draw();
     </script>
 </body>
