@@ -58,7 +58,7 @@ with st.sidebar:
     st.divider()
     st.caption("Зохиогч С.БАТБААТАР | 2026")
 
-# --- 0. ДАШБОАРД ХЭСЭГ (ШИНЭЧЛЭГДСЭН) ---
+# --- 0. ДАШБОАРД ХЭСЭГ (ШИНЭ) ---
 if menu == "📊 Дашбоард":
     st.markdown(f"<h2 style='text-align: center; color: #1f3b64;'>⚡ ҮЙЛДВЭРЛЭЛИЙН НЭГДСЭН ДАШБОАРД</h2>", unsafe_allow_html=True)
     df_p = st.session_state.prod_df.copy()
@@ -79,48 +79,41 @@ if menu == "📊 Дашбоард":
         total_produced_all = df_p['Quantity'].sum()
         remaining_stock = total_supply_val - total_produced_all
 
-        # 1. ДЭЭД ТАЛД: Гурван Gauge график
+        # Гурван Gauge график
         m1, m2, m3 = st.columns(3)
         with m1:
             fig1 = go.Figure(go.Indicator(
                 mode = "gauge+number", value = last_prod_qty, 
                 title = {'text': f"СҮҮЛИЙН ҮЙЛДВЭРЛЭЛ<br><span style='font-size:0.8em;color:gray'>{last_date_str}</span>"},
-                gauge = {'axis': {'range': [None, 200]}, 'bar': {'color': "#FF4B4B"}}))
+                gauge = {'axis': {'range': [None, 150]}, 'bar': {'color': "#FF4B4B"}}))
             fig1.update_layout(height=280, margin=dict(l=20, r=20, t=50, b=20))
             st.plotly_chart(fig1, use_container_width=True)
             
         with m2:
             fig2 = go.Figure(go.Indicator(
                 mode = "gauge+number", value = month_prod, title = {'text': "ЭНЭ САР (Ш)"},
-                gauge = {'axis': {'range': [None, 3000]}, 'bar': {'color': "#1f3b64"}}))
+                gauge = {'axis': {'range': [None, 2000]}, 'bar': {'color': "#1f3b64"}}))
             fig2.update_layout(height=280, margin=dict(l=20, r=20, t=50, b=20))
             st.plotly_chart(fig2, use_container_width=True)
             
         with m3:
             fig3 = go.Figure(go.Indicator(
                 mode = "gauge+number", value = remaining_stock, title = {'text': "ҮЛДЭГДЭЛ (Ш)"},
-                gauge = {'axis': {'range': [None, 10000]}, 'bar': {'color': "#28a745"}}))
+                gauge = {'axis': {'range': [None, 5000]}, 'bar': {'color': "#28a745"}}))
             fig3.update_layout(height=280, margin=dict(l=20, r=20, t=50, b=20))
             st.plotly_chart(fig3, use_container_width=True)
 
         st.divider()
-
-        # 2. ДООД ТАЛД: Bar болон Pie график
         g1, g2 = st.columns([2, 1])
         with g1:
-            # Сар бүрийн үйлдвэрлэлийг маркаар харуулах
-            df_p['Month_Name'] = df_p['Date'].dt.month
-            fig_bar = px.bar(df_p, x='Month_Name', y='Quantity', color='Meter Model', 
-                             title="Сар бүрийн үйлдвэрлэл", barmode='stack',
-                             labels={'Month_Name': 'Сар', 'Quantity': 'Тоо ширхэг'})
+            fig_bar = px.bar(df_p, x=df_p['Date'].dt.month, y='Quantity', color='Meter Model', title="Сар бүрийн үйлдвэрлэл", barmode='stack')
             st.plotly_chart(fig_bar, use_container_width=True)
         with g2:
-            # Нийт үйлдвэрлэлийн бүтцийг маркаар харуулах
-            fig_pie = px.pie(df_p, values='Quantity', names='Meter Model', 
-                             title="Нийт бүтцийн хувь", hole=0.4)
+            fig_pie = px.pie(df_p, values='Quantity', names='Meter Model', title="Нийт бүтцийн хувь", hole=0.4)
             st.plotly_chart(fig_pie, use_container_width=True)
     else:
         st.info("Өгөгдөл байхгүй байна. 'Бүртгэл' цэсээр орж өгөгдөл оруулна уу.")
+
 # --- 1. ТАЙЛАН ---
 elif menu == "📋 Тайлан":
     st.header("📋 Үйлдвэрлэлийн нэгтгэл тайлан")
