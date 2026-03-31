@@ -53,67 +53,68 @@ with st.sidebar:
     
     is_admin = st.toggle("🛠️ Засах эрх идэвхжүүлэх", value=False)
     st.divider()
-    # "Тайлан" цэсний дээр "Дашбоард" цэс нэмэгдсэн
+    # "Дашбоард" цэс нэмэгдсэн
     menu = st.radio("Үндсэн цэс:", ["📊 Дашбоард", "📋 Тайлан", "📈 График", "🗄️ Архив", "🏠 Бүртгэл", "📦 Нийлүүлэлт", "⚙️ Тохиргоо"])
     st.divider()
     st.caption("Зохиогч С.БАТБААТАР | 2026")
 
 # --- 0. ДАШБОАРД ХЭСЭГ (ШИНЭ) ---
 if menu == "📊 Дашбоард":
-    st.markdown(f"<h2 style='text-align: center; color: #1f3b64;'>⚡ УХААЛАГ ТООЛУУРЫН ҮЙЛДВЭРЛЭЛИЙН ДАШБОАРД</h2>", unsafe_allow_html=True)
+    st.markdown(f"<h2 style='text-align: center; color: #1f3b64;'>⚡ ҮЙЛДВЭРЛЭЛИЙН НЭГДСЭН ДАШБОАРД</h2>", unsafe_allow_html=True)
     df_p = st.session_state.prod_df.copy()
     df_c = st.session_state.contract_df.copy()
     
     if not df_p.empty:
         df_p['Date'] = pd.to_datetime(df_p['Date'])
         supply_cols = [c for c in df_c.columns if c != "Марк"]
-        today = datetime.date.today()
         
-        # KPI тооцооллууд
-        today_prod = df_p[df_p['Date'].dt.date == today]['Quantity'].sum()
+        # Хамгийн сүүлийн үйлдвэрлэсэн огноо болон тоог олох
+        last_date = df_p['Date'].max()
+        last_prod_qty = df_p[df_p['Date'] == last_date]['Quantity'].sum()
+        last_date_str = last_date.strftime('%Y-%m-%d')
+        
+        today = datetime.date.today()
         month_prod = df_p[df_p['Date'].dt.month == today.month]['Quantity'].sum()
         total_supply_val = df_c[supply_cols].sum().sum()
         total_produced_all = df_p['Quantity'].sum()
         remaining_stock = total_supply_val - total_produced_all
 
-        # Дээд талын 3 Gauge график
+        # Гурван Gauge график
         m1, m2, m3 = st.columns(3)
         with m1:
             fig1 = go.Figure(go.Indicator(
-                mode = "gauge+number", value = today_prod,
-                title = {'text': "ӨНӨӨДРИЙН ҮЙЛДВЭРЛЭЛ"},
-                gauge = {'axis': {'range': [None, 100]}, 'bar': {'color': "#FF4B4B"}}))
-            fig1.update_layout(height=300)
+                mode = "gauge+number", value = last_prod_qty, 
+                title = {'text': f"СҮҮЛИЙН ҮЙЛДВЭРЛЭЛ<br><span style='font-size:0.8em;color:gray'>{last_date_str}</span>"},
+                gauge = {'axis': {'range': [None, 150]}, 'bar': {'color': "#FF4B4B"}}))
+            fig1.update_layout(height=280, margin=dict(l=20, r=20, t=50, b=20))
             st.plotly_chart(fig1, use_container_width=True)
+            
         with m2:
             fig2 = go.Figure(go.Indicator(
-                mode = "gauge+number", value = month_prod,
-                title = {'text': "САРЫН НИЙТ ҮЙЛДВЭРЛЭЛ"},
+                mode = "gauge+number", value = month_prod, title = {'text': "ЭНЭ САР (Ш)"},
                 gauge = {'axis': {'range': [None, 2000]}, 'bar': {'color': "#1f3b64"}}))
-            fig2.update_layout(height=300)
+            fig2.update_layout(height=280, margin=dict(l=20, r=20, t=50, b=20))
             st.plotly_chart(fig2, use_container_width=True)
+            
         with m3:
             fig3 = go.Figure(go.Indicator(
-                mode = "gauge+number", value = remaining_stock,
-                title = {'text': "АГУУЛАХЫН ҮЛДЭГДЭЛ"},
+                mode = "gauge+number", value = remaining_stock, title = {'text': "ҮЛДЭГДЭЛ (Ш)"},
                 gauge = {'axis': {'range': [None, 5000]}, 'bar': {'color': "#28a745"}}))
-            fig3.update_layout(height=300)
+            fig3.update_layout(height=280, margin=dict(l=20, r=20, t=50, b=20))
             st.plotly_chart(fig3, use_container_width=True)
 
         st.divider()
-        # Бүтцийн графикууд
         g1, g2 = st.columns([2, 1])
         with g1:
-            fig_bar = px.bar(df_p, x=df_p['Date'].dt.month, y='Quantity', color='Meter Model', 
-                             title="Сар бүрийн үйлдвэрлэл (Маркаар)", barmode='stack')
+            fig_bar = px.bar(df_p, x=df_p['Date'].dt.month, y='Quantity', color='Meter Model', title="Сар бүрийн үйлдвэрлэл", barmode='stack')
             st.plotly_chart(fig_bar, use_container_width=True)
         with g2:
-            fig_pie = px.pie(df_p, values='Quantity', names='Meter Model', title="Нийт үйлдвэрлэлийн бүтэц", hole=0.4)
+            fig_pie = px.pie(df_p, values='Quantity', names='Meter Model', title="Нийт бүтцийн хувь", hole=0.4)
             st.plotly_chart(fig_pie, use_container_width=True)
     else:
         st.info("Өгөгдөл байхгүй байна. 'Бүртгэл' цэсээр орж өгөгдөл оруулна уу.")
 
-# --- 1. ТАЙЛАН (ОГТ ӨӨРЧЛӨӨГҮЙ) ---
+# --- 1. ТАЙЛАН ---
 elif menu == "📋 Тайлан":
     st.header("📋 Үйлдвэрлэлийн нэгтгэл тайлан")
     df_p = st.session_state.prod_df.copy()
@@ -175,7 +176,7 @@ elif menu == "📋 Тайлан":
         all_totals["Марк"] = "🔥🔥 НИЙТ"
         st.dataframe(pd.concat([all_report, all_totals], ignore_index=True), use_container_width=True, hide_index=True)
 
-# --- 2. ГРАФИК (ОГТ ӨӨРЧЛӨӨГҮЙ) ---
+# --- 2. ГРАФИК ---
 elif menu == "📈 График":
     st.header("📈 Үйлдвэрлэлийн шинжилгээ")
     df_p = st.session_state.prod_df.copy()
@@ -200,7 +201,7 @@ elif menu == "📈 График":
         st.subheader("📈 3. Нийт хуримтлагдсан өсөлт")
         st.area_chart(df_p.sort_values('Date').groupby('Date')['Quantity'].sum().cumsum())
 
-# --- 3. АРХИВ (ОГТ ӨӨРЧЛӨӨГҮЙ) ---
+# --- 3. АРХИВ ---
 elif menu == "🗄️ Архив":
     st.header("🗄️ Түүхэн архив")
     df_p = st.session_state.prod_df.copy()
@@ -218,7 +219,7 @@ elif menu == "🗄️ Архив":
         with t2:
             st.dataframe(df_yr.sort_values('Date', ascending=False), use_container_width=True, hide_index=True)
 
-# --- 4. БҮРТГЭЛ (ОГТ ӨӨРЧЛӨӨГҮЙ) ---
+# --- 4. БҮРТГЭЛ ---
 elif menu == "🏠 Бүртгэл":
     st.header("🏭 Үйлдвэрлэлийн Бүртгэл")
     if is_admin:
@@ -262,7 +263,7 @@ elif menu == "🏠 Бүртгэл":
                     save_data(st.session_state.prod_df, DATA_FILE)
                     st.rerun()
 
-# --- 5. НИЙЛҮҮЛЭЛТ (ОГТ ӨӨРЧЛӨӨГҮЙ) ---
+# --- 5. НИЙЛҮҮЛЭЛТ ---
 elif menu == "📦 Нийлүүлэлт":
     st.header("📦 Нийлүүлэлтийн удирдлага")
     if is_admin:
@@ -282,7 +283,7 @@ elif menu == "📦 Нийлүүлэлт":
     else:
         st.dataframe(st.session_state.contract_df, hide_index=True, use_container_width=True)
 
-# --- 6. ТОХИРГОО (ОГТ ӨӨРЧЛӨӨГҮЙ) ---
+# --- 6. ТОХИРГОО ---
 elif menu == "⚙️ Тохиргоо":
     st.header("⚙️ Системийн тохиргоо")
     if is_admin:
